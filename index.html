@@ -132,6 +132,31 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
 .gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;}
 .gauge-lbl{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;text-align:center;}
 .gauge-sub{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:2px;}
+.decision-block{display:flex;flex-direction:column;gap:10px;margin-bottom:12px;}
+.decision-btn{display:flex;align-items:center;justify-content:center;gap:10px;padding:14px;border:2px solid;font-family:'Orbitron',monospace;font-size:22px;font-weight:900;letter-spacing:4px;cursor:default;transition:all .4s;}
+.decision-btn.buy{border-color:var(--green);color:var(--green);background:rgba(0,255,136,.08);box-shadow:0 0 30px rgba(0,255,136,.2),inset 0 0 20px rgba(0,255,136,.05);}
+.decision-btn.sell{border-color:var(--red);color:var(--red);background:rgba(255,45,85,.08);box-shadow:0 0 30px rgba(255,45,85,.2),inset 0 0 20px rgba(255,45,85,.05);}
+.decision-btn.hold{border-color:var(--yellow);color:var(--yellow);background:rgba(255,214,10,.08);box-shadow:0 0 30px rgba(255,214,10,.15),inset 0 0 20px rgba(255,214,10,.05);}
+.decision-icon{font-size:28px;}
+.decision-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;}
+.dmeta-cell{background:rgba(255,255,255,.03);border:1px solid var(--border);padding:8px 10px;display:flex;flex-direction:column;gap:2px;}
+.dmeta-lbl{font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;}
+.dmeta-val{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;}
+.dmeta-val.g{color:var(--green);}
+.dmeta-val.r{color:var(--red);}
+.dmeta-val.y{color:var(--yellow);}
+.dmeta-val.p{color:var(--purple);}
+.risk-bar-wrap{margin-bottom:10px;}
+.risk-bar-lbl{display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);margin-bottom:4px;}
+.risk-bar{height:6px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden;}
+.risk-fill{height:100%;border-radius:3px;transition:width 1s cubic-bezier(.4,0,.2,1);}
+.context-text{font-size:12px;line-height:1.6;color:var(--dim);border-left:2px solid var(--border);padding-left:10px;}
+.context-text .hi{color:var(--text);font-weight:600;}
+.context-text .g{color:var(--green);}
+.context-text .r{color:var(--red);}
+.context-text .y{color:var(--yellow);}
+.context-text .p{color:var(--purple);}
+@keyframes decisionPulse{0%,100%{opacity:1}50%{opacity:.7}}
 .feed{display:flex;flex-direction:column;gap:8px;}
 .post{padding:9px 11px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:2px;transition:all .15s;}
 .post:hover{background:rgba(255,255,255,.04);border-color:rgba(0,212,255,.2);}
@@ -235,6 +260,7 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
   </div>
 
   <div class="right-panel">
+   <!-- DECISION ENGINE PANEL -->
    <div class="panel">
     <div class="panel-hdr">
      <span class="panel-title">⚡ SIGNAL ANALYSIS</span>
@@ -244,16 +270,20 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
       <button class="nav-btn" onclick="navCoin(1)">▶</button>
      </div>
     </div>
-    <div class="panel-body">
-     <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--blue);margin-bottom:8px;letter-spacing:1px;" id="analysisLabel">USE ◀ ▶ OR CLICK A COIN</div>
-     <div class="analysis-text" id="analysisBox">
-      <div class="thinking"><span>Click any coin or use arrows to browse all signals</span></div>
+    <div class="panel-body" style="padding:12px;">
+     <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--blue);margin-bottom:10px;letter-spacing:1px;" id="analysisLabel">USE ◀ ▶ OR CLICK A COIN</div>
+     <div id="decisionBox">
+      <div class="thinking" style="padding:20px 0;"><span>Click any coin for buy/sell/hold signal</span></div>
      </div>
     </div>
    </div>
 
+   <!-- PER-COIN GAUGE -->
    <div class="panel">
-    <div class="panel-hdr"><span class="panel-title">📊 MARKET SENTIMENT</span></div>
+    <div class="panel-hdr">
+     <span class="panel-title">📊 COIN SENTIMENT</span>
+     <span class="panel-sub" id="gaugeLabel">MARKET AVERAGE</span>
+    </div>
     <div class="panel-body">
      <div class="gauge-wrap">
       <svg width="160" height="80" viewBox="0 0 160 80">
@@ -271,11 +301,12 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
        <circle cx="80" cy="75" r="5" fill="white"/>
       </svg>
       <div class="gauge-lbl" id="gLabel" style="color:var(--yellow)">LOADING...</div>
-      <div class="gauge-sub">MARKET FEAR / GREED</div>
+      <div class="gauge-sub" id="gSub">SELECT A COIN</div>
      </div>
     </div>
    </div>
 
+   <!-- REDDIT FEED -->
    <div class="panel">
     <div class="panel-hdr">
      <span class="panel-title">🤖 REDDIT FEED</span>
@@ -286,6 +317,7 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
     </div>
    </div>
 
+   <!-- TRENDING TAGS -->
    <div class="panel">
     <div class="panel-hdr"><span class="panel-title">🔥 TRENDING TAGS</span></div>
     <div class="panel-body"><div class="tags" id="tagsBox"></div></div>
@@ -492,7 +524,7 @@ function selectCoin(id){
     renderAnalysis(selected);
     renderFeed(selected);
     // scroll analysis panel into view on mobile
-    document.getElementById('analysisBox').scrollIntoView({behavior:'smooth',block:'nearest'});
+    document.getElementById('decisionBox').scrollIntoView({behavior:'smooth',block:'nearest'});
   }
 }
 
@@ -509,24 +541,86 @@ function navCoin(dir){
 }
 
 function renderAnalysis(c){
-  document.getElementById('analysisLabel').textContent=c.ticker;
-  const box=document.getElementById('analysisBox');
-  box.innerHTML=`<div class="thinking"><span>ANALYSING</span><span class="dots"><span>.</span><span>.</span><span>.</span></span></div>`;
+  document.getElementById('analysisLabel').textContent=c.ticker+' · '+c.name;
+  const box=document.getElementById('decisionBox');
+  box.innerHTML=`<div class="thinking"><span>COMPUTING SIGNAL</span><span class="dots"><span>.</span><span>.</span><span>.</span></span></div>`;
   setTimeout(()=>{
-    const srcs=[];
-    if(c.isTrend)srcs.push(`<span class='p'>trending on CoinGecko search</span>`);
-    if(c.badges.includes('volume-spike'))srcs.push(`<span class='g'>volume/mcap spiking</span>`);
-    if(c.badges.includes('gainer'))srcs.push(`<span class='g'>top 24h gainer</span>`);
-    if(c.badges.includes('dumping'))srcs.push(`<span class='r'>top 24h loser</span>`);
-    if(c.badges.includes('reddit'))srcs.push(`<span class='y'>trending on Reddit</span>`);
-    const srcLine=srcs.length?`Signals detected: ${srcs.join(' · ')}.`:'';
-    let body='';
-    if(c.signal==='trend')body=`<span class='hi'>${c.ticker}</span> is <span class='p hi'>trending on CoinGecko search</span> right now — thousands of people looking it up simultaneously. Price: <span class='hi'>${c.change}</span> · Vol: <span class='hi'>${c.vol}</span> · Mcap: <span class='hi'>${c.mcap}</span>. ${srcLine} Hype: <span class='g'>${c.hype}/100</span>. <span class='y'>Trending search = early retail FOMO. Watch for acceleration.</span>`;
-    else if(c.signal==='moon')body=`<span class='hi'>${c.ticker}</span> is <span class='g'>surging ${c.change} in 24h</span>. Vol: <span class='hi'>${c.vol}</span> · Mcap: <span class='hi'>${c.mcap}</span>. ${srcLine} Hype: <span class='g'>${c.hype}/100</span>. <span class='y'>Strong momentum — set a stop-loss and watch for exhaustion signals.</span>`;
-    else if(c.signal==='dump')body=`<span class='hi'>${c.ticker}</span> is <span class='r'>down ${c.change} in 24h</span>. Vol: <span class='hi'>${c.vol}</span> · Mcap: <span class='hi'>${c.mcap}</span>. ${srcLine} Hype: <span class='r'>${c.hype}/100</span>. <span class='r'>Dominant sell pressure detected. High risk of further downside.</span>`;
-    else body=`<span class='hi'>${c.ticker}</span> is consolidating: <span class='y'>${c.change}</span> in 24h. Vol: <span class='hi'>${c.vol}</span>. ${srcLine} Hype: <span class='y'>${c.hype}/100</span>. <span class='y'>No clear signal yet — watch for a volume spike as the breakout catalyst.</span>`;
-    box.innerHTML=body;
-  },750);
+    const ch=c.ch24, hype=c.hype, redditHit=c.badges.includes('reddit'), isTrend=c.isTrend;
+    let score=0;
+    if(ch>20)score+=3; else if(ch>8)score+=2; else if(ch>2)score+=1;
+    else if(ch<-15)score-=3; else if(ch<-5)score-=2; else if(ch<-1)score-=1;
+    if(hype>80)score+=2; else if(hype>60)score+=1; else if(hype<30)score-=1;
+    if(isTrend)score+=1;
+    if(redditHit)score+=1;
+    if(ch<0&&hype>70)score-=1;
+    let decision,decClass,decIcon,confidence,riskLevel,riskColor,riskPct,context;
+    if(score>=4){
+      decision='BUY';decClass='buy';decIcon='🚀';confidence=Math.min(95,60+score*5);
+      riskLevel='HIGH RISK';riskColor='var(--yellow)';riskPct=72;
+      context=`<span class='g hi'>Strong buy signal.</span> ${c.ticker} is showing <span class='hi'>${ch>=0?'+':''}${ch.toFixed(1)}%</span> price action with hype score <span class='g'>${hype}/100</span>${isTrend?' and trending on CoinGecko search':''}.${redditHit?' Reddit momentum is building.':''} <span class='y'>Consider a small initial position with a stop-loss at 20% below entry.</span>`;
+    } else if(score>=2){
+      decision='BUY';decClass='buy';decIcon='📈';confidence=Math.min(75,45+score*6);
+      riskLevel='MEDIUM-HIGH RISK';riskColor='var(--yellow)';riskPct=58;
+      context=`<span class='g'>Moderate buy signal.</span> ${c.ticker} has positive momentum — <span class='hi'>${ch>=0?'+':''}${ch.toFixed(1)}%</span> in 24h, hype <span class='y'>${hype}/100</span>.${redditHit?' Reddit activity adds confidence.':''} <span class='y'>Wait for volume confirmation or a small dip before entering. Use a tight stop-loss.</span>`;
+    } else if(score<=-3){
+      decision='SELL';decClass='sell';decIcon='🔻';confidence=Math.min(92,60+Math.abs(score)*5);
+      riskLevel='HOLDING = HIGH RISK';riskColor='var(--red)';riskPct=88;
+      context=`<span class='r hi'>Strong sell signal.</span> ${c.ticker} is down <span class='r'>${ch.toFixed(1)}%</span> with dominant sell pressure. Hype fading at <span class='r'>${hype}/100</span>. <span class='r'>If holding, this is your signal to exit or reduce.</span> <span class='y'>Consider a limit sell above current price to catch any bounce.</span>`;
+    } else if(score<=-1){
+      decision='SELL';decClass='sell';decIcon='⚠️';confidence=Math.min(68,40+Math.abs(score)*7);
+      riskLevel='ELEVATED RISK';riskColor='var(--red)';riskPct=65;
+      context=`<span class='r'>Weak sell signal.</span> ${c.ticker} showing <span class='hi'>${ch.toFixed(1)}%</span> with declining momentum. Hype: <span class='y'>${hype}/100</span>. <span class='y'>If holding, consider taking partial profits. If watching, wait for a better entry point.</span>`;
+    } else {
+      decision='HOLD';decClass='hold';decIcon='⏳';confidence=Math.min(65,40+hype/5);
+      riskLevel='MODERATE RISK';riskColor='var(--yellow)';riskPct=45;
+      context=`<span class='y hi'>Hold / Watch signal.</span> ${c.ticker} consolidating — <span class='hi'>${ch>=0?'+':''}${ch.toFixed(1)}%</span> in 24h, hype <span class='y'>${hype}/100</span>.${isTrend?' Trending search suggests awareness is growing.':''} <span class='y'>Watch for a volume spike as the breakout trigger before entering.</span>`;
+    }
+    const riskFillColor=riskPct>70?'var(--red)':riskPct>45?'var(--yellow)':'var(--green)';
+    box.innerHTML=`
+      <div class="decision-block">
+        <div class="decision-btn ${decClass}"><span class="decision-icon">${decIcon}</span><span>${decision}</span></div>
+      </div>
+      <div class="decision-meta">
+        <div class="dmeta-cell"><div class="dmeta-lbl">Confidence</div><div class="dmeta-val ${decClass==='buy'?'g':decClass==='sell'?'r':'y'}">${confidence}%</div></div>
+        <div class="dmeta-cell"><div class="dmeta-lbl">24h Change</div><div class="dmeta-val ${ch>=0?'g':'r'}">${ch>=0?'+':''}${ch.toFixed(2)}%</div></div>
+        <div class="dmeta-cell"><div class="dmeta-lbl">Hype Score</div><div class="dmeta-val ${hype>70?'g':hype>45?'y':'r'}">${hype}/100</div></div>
+        <div class="dmeta-cell"><div class="dmeta-lbl">Mcap</div><div class="dmeta-val">${c.mcap}</div></div>
+      </div>
+      <div class="risk-bar-wrap">
+        <div class="risk-bar-lbl"><span style="color:${riskColor}">${riskLevel}</span><span>${riskPct}%</span></div>
+        <div class="risk-bar"><div class="risk-fill" style="width:${riskPct}%;background:${riskFillColor};"></div></div>
+      </div>
+      <div class="context-text">${context}</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--dim);margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">⚠ NOT FINANCIAL ADVICE · DYOR · Crypto is high risk</div>`;
+    setCoinGauge(c,score);
+  },700);
+}
+
+function setCoinGauge(c,score){
+  const val=Math.max(0,Math.min(100,50+(score*9)));
+  document.getElementById('needle').style.transform=`rotate(${(val/100)*180-90}deg)`;
+  const lbl=document.getElementById('gLabel');
+  document.getElementById('gSub').textContent=c.ticker+' SENTIMENT';
+  if(val<20){lbl.textContent='STRONG SELL';lbl.style.color='var(--red)';}
+  else if(val<38){lbl.textContent='BEARISH';lbl.style.color='#ff6b35';}
+  else if(val<48){lbl.textContent='WEAK SELL';lbl.style.color='#ffaa35';}
+  else if(val<55){lbl.textContent='NEUTRAL';lbl.style.color='var(--yellow)';}
+  else if(val<68){lbl.textContent='BULLISH';lbl.style.color='#80ff72';}
+  else{lbl.textContent='STRONG BUY';lbl.style.color='var(--green)';}
+}
+
+function setGauge(){
+  if(!coins.length)return;
+  const avg=coins.reduce((a,c)=>a+c.ch24,0)/coins.length;
+  const val=Math.max(0,Math.min(100,50+avg*2.2));
+  document.getElementById('needle').style.transform=`rotate(${(val/100)*180-90}deg)`;
+  const lbl=document.getElementById('gLabel');
+  document.getElementById('gSub').textContent='MARKET AVERAGE';
+  if(val<20){lbl.textContent='EXTREME FEAR';lbl.style.color='var(--red)';}
+  else if(val<40){lbl.textContent='FEAR';lbl.style.color='#ff8c42';}
+  else if(val<60){lbl.textContent='NEUTRAL';lbl.style.color='var(--yellow)';}
+  else if(val<80){lbl.textContent='GREED';lbl.style.color='#80ff72';}
+  else{lbl.textContent='EXTREME GREED';lbl.style.color='var(--green)';}
 }
 
 function renderFeed(coin){
