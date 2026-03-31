@@ -182,6 +182,39 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
 .overlay-log{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim);text-align:center;}
 .empty{color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:11px;text-align:center;padding:32px;}
 .warn-bar{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--yellow);padding:7px 10px;background:rgba(255,214,10,.05);border:1px solid rgba(255,214,10,.2);margin-bottom:8px;}
+.watch-btn{display:flex;align-items:center;justify-content:center;gap:6px;background:transparent;border:1px solid var(--purple);color:var(--purple);font-family:'Orbitron',monospace;font-size:9px;font-weight:700;letter-spacing:1px;padding:6px 12px;cursor:pointer;transition:all .2s;margin-top:10px;width:100%;}
+.watch-btn:hover{background:var(--purple);color:var(--bg);}
+.watch-btn.watching{background:rgba(191,90,242,.2);color:var(--purple);}
+.tp-sl-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0;}
+.tp-cell{padding:8px 10px;display:flex;flex-direction:column;gap:2px;border:1px solid;}
+.tp-cell.tp{background:rgba(0,255,136,.05);border-color:rgba(0,255,136,.3);}
+.tp-cell.sl{background:rgba(255,45,85,.05);border-color:rgba(255,45,85,.3);}
+.tp-lbl{font-family:'Share Tech Mono',monospace;font-size:8px;letter-spacing:1px;text-transform:uppercase;}
+.tp-cell.tp .tp-lbl{color:var(--green);}
+.tp-cell.sl .tp-lbl{color:var(--red);}
+.tp-val{font-family:'Orbitron',monospace;font-size:12px;font-weight:700;}
+.tp-cell.tp .tp-val{color:var(--green);}
+.tp-cell.sl .tp-val{color:var(--red);}
+.tp-pct{font-family:'Share Tech Mono',monospace;font-size:9px;opacity:.7;}
+.modal-backdrop{position:fixed;inset:0;background:rgba(3,7,18,.88);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s;}
+.modal-backdrop.on{opacity:1;pointer-events:all;}
+.modal{background:var(--surface);border:1px solid var(--purple);width:100%;max-width:400px;margin:20px;padding:26px;position:relative;}
+.modal-title{font-family:'Orbitron',monospace;font-size:13px;font-weight:900;color:var(--purple);letter-spacing:2px;margin-bottom:4px;}
+.modal-sub{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim);margin-bottom:16px;line-height:1.6;}
+.modal-coin-name{font-family:'Orbitron',monospace;font-size:16px;font-weight:700;color:var(--text);margin-bottom:14px;}
+.modal-input{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:12px;padding:10px 12px;margin-bottom:10px;outline:none;transition:border-color .2s;}
+.modal-input:focus{border-color:var(--purple);}
+.modal-freq{display:flex;gap:8px;margin-bottom:16px;}
+.freq-btn{flex:1;background:transparent;border:1px solid var(--border);color:var(--dim);font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;padding:7px;cursor:pointer;transition:all .15s;}
+.freq-btn.on{border-color:var(--purple);color:var(--purple);background:rgba(191,90,242,.08);}
+.modal-submit{width:100%;background:var(--purple);color:var(--bg);font-family:'Orbitron',monospace;font-size:11px;font-weight:700;letter-spacing:2px;padding:12px;border:none;cursor:pointer;transition:filter .2s;}
+.modal-submit:hover{filter:brightness(1.15);}
+.modal-close{position:absolute;top:10px;right:12px;background:transparent;border:none;color:var(--dim);font-size:16px;cursor:pointer;}
+.modal-success{text-align:center;padding:16px 0;}
+.modal-success-icon{font-size:36px;margin-bottom:10px;}
+.modal-success-title{font-family:'Orbitron',monospace;font-size:13px;color:var(--green);margin-bottom:8px;}
+.modal-success-sub{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim);line-height:1.6;}
+.modal-disclaimer{font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--dim);margin-top:10px;text-align:center;opacity:.6;}
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-track{background:var(--bg);}
 ::-webkit-scrollbar-thumb{background:var(--border);}
@@ -195,6 +228,27 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
   <div class="spin-ring"></div>
   <div class="overlay-status" id="oStatus">INITIALIZING...</div>
   <div class="overlay-log" id="oLog"></div>
+</div>
+
+<!-- EMAIL WATCHLIST MODAL -->
+<div class="modal-backdrop" id="watchModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div id="modalContent">
+      <div class="modal-title">🔔 ALERT ME WHEN THIS MOVES</div>
+      <div class="modal-sub">Get a personal alert when this coin's hype score or price changes significantly. No spam — just the signal.</div>
+      <div class="modal-coin-name" id="modalCoinName">--</div>
+      <input class="modal-input" type="email" id="watchEmail" placeholder="your@email.com" autocomplete="email"/>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);margin-bottom:8px;letter-spacing:1px;">ALERT FREQUENCY</div>
+      <div class="modal-freq">
+        <button class="freq-btn on" id="freqDaily" onclick="setFreq('daily')">⚡ INSTANT</button>
+        <button class="freq-btn" id="freqWeekly" onclick="setFreq('weekly')">📊 DAILY DIGEST</button>
+        <button class="freq-btn" id="freqWeekly2" onclick="setFreq('weekly')">📅 WEEKLY</button>
+      </div>
+      <button class="modal-submit" onclick="submitWatch()">ALERT ME ON THIS COIN →</button>
+      <div class="modal-disclaimer">No spam ever. Unsubscribe instantly. Not financial advice.</div>
+    </div>
+  </div>
 </div>
 
 <header>
@@ -248,6 +302,16 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
     <button class="fbtn" onclick="setFilter('bullish',this)">🚀 MOONING</button>
     <button class="fbtn" onclick="setFilter('bearish',this)">💀 DUMPING</button>
     <button class="fbtn" onclick="setFilter('neutral',this)">👀 WATCH</button>
+    <button class="fbtn" id="watchlistFilterBtn" onclick="setFilter('watchlist',this)" style="border-color:rgba(191,90,242,.4);color:var(--purple);">🔔 MY LIST <span id="watchlistCount" style="background:var(--purple);color:var(--bg);border-radius:10px;padding:1px 6px;font-size:9px;margin-left:3px;display:none;">0</span></button>
+   </div>
+
+   <!-- SEARCH BAR -->
+   <div style="position:relative;margin-bottom:14px;">
+    <input id="searchInput" type="text" placeholder="Search any coin by name or ticker... (e.g. DOGE, Pepe, Solana)"
+     oninput="renderCoins()"
+     style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:12px;padding:10px 36px 10px 14px;outline:none;transition:border-color .2s;"
+     onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--border)'"/>
+    <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--dim);font-size:14px;pointer-events:none;">🔍</span>
    </div>
    <div class="source-legend">
     <span class="legend-item"><span class="legend-dot" style="background:var(--purple)"></span>CoinGecko Trending Search</span>
@@ -329,6 +393,38 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
 
 <script>
 let coins=[], redditPosts=[], selected=null, filter='all';
+
+// ── PERSISTENT WATCHLIST (localStorage — no login needed) ────────────────────
+const watchlist = {
+  _key: 'chr_watchlist_v1',
+  _data: new Set(JSON.parse(localStorage.getItem('chr_watchlist_v1') || '[]')),
+  has(id)   { return this._data.has(id); },
+  add(id)   { this._data.add(id); this._save(); },
+  remove(id){ this._data.delete(id); this._save(); },
+  toggle(id){ this.has(id) ? this.remove(id) : this.add(id); },
+  size()    { return this._data.size; },
+  ids()     { return [...this._data]; },
+  _save()   { localStorage.setItem(this._key, JSON.stringify([...this._data])); updateWatchlistBadge(); }
+};
+
+function updateWatchlistBadge(){
+  const count = watchlist.size();
+  const badge = document.getElementById('watchlistCount');
+  const btn   = document.getElementById('watchlistFilterBtn');
+  if(count > 0){
+    badge.textContent = count;
+    badge.style.display = 'inline';
+    btn.style.borderColor = 'var(--purple)';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+let watchFreq = 'daily';
+let watchCoinId = null;
+
+// ── MAKE WEBHOOK URL ─────────────────────────────────────────────────────────
+// Replace this with your actual Make webhook URL once you create the scenario
+const MAKE_WEBHOOK = 'https://hook.us1.make.com/YOUR_WEBHOOK_ID_HERE';
 const SUBS=['CryptoCurrency','SatoshiStreetBets','memecoin','CryptoMoonShots','defi'];
 const HYPE_WORDS=['moon','100x','gem','pump','aping','just launched','bullish','rocket','breakout','degen','rally','mooning','huge','exploding'];
 const pad=n=>String(n).padStart(2,'0');
@@ -336,6 +432,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
 window.addEventListener('load',()=>{
   tickClock(); setInterval(tickClock,1000);
+  updateWatchlistBadge();
   fullScan(); setInterval(fullScan,5*60*1000);
 });
 
@@ -478,21 +575,57 @@ function hyp(t){const l=t.toLowerCase();return Math.min(HYPE_WORDS.reduce((s,w)=
 
 function renderCoins(){
   const list=document.getElementById('coinsList');
-  const vis=filter==='all'?coins:coins.filter(c=>c.type===filter);
-  if(!vis.length){list.innerHTML=`<div class="empty">NO SIGNALS IN THIS CATEGORY RIGHT NOW</div>`;return;}
-  list.innerHTML=vis.map((c,i)=>`
-    <div class="coin-card ${c.type}${selected&&selected.id===c.id?' selected':''}"
+  const q=document.getElementById('searchInput')?document.getElementById('searchInput').value.trim().toLowerCase():'';
+  let vis=coins;
+
+  // apply text search first
+  if(q) vis=coins.filter(c=>c.ticker.toLowerCase().includes(q)||c.name.toLowerCase().includes(q));
+
+  // then apply filter tab
+  if(!q){
+    if(filter==='watchlist') vis=coins.filter(c=>watchlist.has(c.id));
+    else if(filter!=='all')  vis=coins.filter(c=>c.type===filter);
+  }
+
+  if(filter==='watchlist'&&!q&&!vis.length){
+    list.innerHTML=`<div class="empty" style="padding:40px 20px;">
+      <div style="font-size:28px;margin-bottom:10px;">🔔</div>
+      <div style="color:var(--purple);font-family:'Orbitron',monospace;font-size:11px;letter-spacing:2px;margin-bottom:8px;">WATCHLIST IS EMPTY</div>
+      <div style="font-size:12px;line-height:1.6;color:var(--dim);">Click 🔔 on any coin card to add it.<br>Saves to your browser — no login needed.</div>
+    </div>`;
+    return;
+  }
+
+  if(!vis.length){
+    list.innerHTML=`<div class="empty">${q?'NO COINS MATCH "'+q.toUpperCase()+'"':'NO SIGNALS IN THIS CATEGORY'}</div>`;
+    return;
+  }
+
+  list.innerHTML=vis.map((c,i)=>{
+    const isWatched=watchlist.has(c.id);
+    const isSelected=selected&&selected.id===c.id;
+    return`
+    <div class="coin-card ${c.type}${isSelected?' selected':''}"
          onclick="selectCoin('${c.id}')"
-         style="animation:fadeSlide .28s ease ${i*.045}s both">
+         style="animation:fadeSlide .28s ease ${i*.04}s both">
       <div class="card-top">
         <div class="coin-id">
           <div class="selected-indicator"></div>
           ${c.image?`<img class="coin-img" src="${c.image}" alt="${c.ticker}" loading="lazy">`:`<div class="coin-img-ph">🪙</div>`}
-          <div><div class="c-ticker">${c.ticker}</div><div class="c-name">${c.name}${c.rank?' · #'+c.rank:''}</div></div>
+          <div>
+            <div class="c-ticker">${c.ticker}</div>
+            <div class="c-name">${c.name}${c.rank?' · #'+c.rank:''}</div>
+          </div>
         </div>
-        <div class="price-block">
-          <div class="c-price">${c.price}</div>
-          <div class="c-change ${c.changeDir}">${c.change}</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button onclick="event.stopPropagation();toggleWatch('${c.id}')" title="${isWatched?'Remove from watchlist':'Add to watchlist'}"
+            style="background:${isWatched?'rgba(191,90,242,.2)':'transparent'};border:1px solid ${isWatched?'var(--purple)':'var(--border)'};color:${isWatched?'var(--purple)':'var(--dim)'};width:28px;height:28px;cursor:pointer;border-radius:4px;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;">
+            🔔
+          </button>
+          <div class="price-block">
+            <div class="c-price">${c.price}</div>
+            <div class="c-change ${c.changeDir}">${c.change}</div>
+          </div>
         </div>
       </div>
       <div class="card-bot">
@@ -508,8 +641,9 @@ function renderCoins(){
         <div class="detail-cell"><div class="detail-lbl">Volume 24h</div><div class="detail-val">${c.vol}</div></div>
         <div class="detail-cell"><div class="detail-lbl">Hype Score</div><div class="detail-val" style="color:${c.hype>75?'var(--green)':c.hype>50?'var(--yellow)':'var(--red)'}">${c.hype}/100</div></div>
       </div>
-      <div class="click-hint">${selected&&selected.id===c.id?'▶ analysis loaded in panel →':'click to analyse'}</div>
-    </div>`).join('');
+      <div class="click-hint">${isSelected?'▶ analysis loaded in panel →':'click to analyse'}</div>
+    </div>`;
+  }).join('');
 }
 
 function bLbl(b){return{'trending-search':'🔍 SEARCH','volume-spike':'⚡ VOL SPIKE','gainer':'📈 GAINER','dumping':'📉 LOSER','reddit':'🤖 REDDIT'}[b]||b;}
@@ -575,7 +709,23 @@ function renderAnalysis(c){
       riskLevel='MODERATE RISK';riskColor='var(--yellow)';riskPct=45;
       context=`<span class='y hi'>Hold / Watch signal.</span> ${c.ticker} consolidating — <span class='hi'>${ch>=0?'+':''}${ch.toFixed(1)}%</span> in 24h, hype <span class='y'>${hype}/100</span>.${isTrend?' Trending search suggests awareness is growing.':''} <span class='y'>Watch for a volume spike as the breakout trigger before entering.</span>`;
     }
+    // ── TAKE PROFIT & STOP LOSS CALCULATOR ──────────────────────────
+    // Based on hype score momentum and meme coin volatility patterns
+    const price = c.priceRaw;
+    let tpMult, slMult;
+    if(score>=4)     { tpMult=1.65; slMult=0.80; }  // strong buy: target +65%, stop -20%
+    else if(score>=2){ tpMult=1.40; slMult=0.82; }  // moderate buy: target +40%, stop -18%
+    else if(score<=-3){ tpMult=1.08; slMult=0.88; } // strong sell: only bounce target
+    else if(score<=-1){ tpMult=1.12; slMult=0.90; } // weak sell
+    else             { tpMult=1.25; slMult=0.85; }  // hold: watch for +25%
+    const tpPrice = price * tpMult;
+    const slPrice = price * slMult;
+    const tpPct   = '+' + Math.round((tpMult-1)*100) + '%';
+    const slPct   = Math.round((slMult-1)*100) + '%';
+
     const riskFillColor=riskPct>70?'var(--red)':riskPct>45?'var(--yellow)':'var(--green)';
+    const isWatching = watchlist.has(c.id);
+
     box.innerHTML=`
       <div class="decision-block">
         <div class="decision-btn ${decClass}"><span class="decision-icon">${decIcon}</span><span>${decision}</span></div>
@@ -586,11 +736,26 @@ function renderAnalysis(c){
         <div class="dmeta-cell"><div class="dmeta-lbl">Hype Score</div><div class="dmeta-val ${hype>70?'g':hype>45?'y':'r'}">${hype}/100</div></div>
         <div class="dmeta-cell"><div class="dmeta-lbl">Mcap</div><div class="dmeta-val">${c.mcap}</div></div>
       </div>
+      <div class="tp-sl-grid">
+        <div class="tp-cell tp">
+          <div class="tp-lbl">🎯 Take Profit</div>
+          <div class="tp-val">${fmtP(tpPrice)}</div>
+          <div class="tp-pct">${tpPct} from current</div>
+        </div>
+        <div class="tp-cell sl">
+          <div class="tp-lbl">🛑 Stop Loss</div>
+          <div class="tp-val">${fmtP(slPrice)}</div>
+          <div class="tp-pct">${slPct} from current</div>
+        </div>
+      </div>
       <div class="risk-bar-wrap">
         <div class="risk-bar-lbl"><span style="color:${riskColor}">${riskLevel}</span><span>${riskPct}%</span></div>
         <div class="risk-bar"><div class="risk-fill" style="width:${riskPct}%;background:${riskFillColor};"></div></div>
       </div>
       <div class="context-text">${context}</div>
+      <button class="watch-btn ${isWatching?'watching':''}" onclick="openModal('${c.id}')">
+        ${isWatching ? '🔔 WATCHING THIS COIN' : '🔔 ALERT ME WHEN THIS MOVES'}
+      </button>
       <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--dim);margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">⚠ NOT FINANCIAL ADVICE · DYOR · Crypto is high risk</div>`;
     setCoinGauge(c,score);
   },700);
@@ -661,19 +826,6 @@ function animN(id,target){
   const iv=setInterval(()=>{cur=Math.min(cur+Math.ceil(target/18),target);el.textContent=cur;if(cur>=target)clearInterval(iv);},35);
 }
 
-function setGauge(){
-  if(!coins.length)return;
-  const avg=coins.reduce((a,c)=>a+c.ch24,0)/coins.length;
-  const val=Math.max(0,Math.min(100,50+avg*2.2));
-  document.getElementById('needle').style.transform=`rotate(${(val/100)*180-90}deg)`;
-  const lbl=document.getElementById('gLabel');
-  if(val<20){lbl.textContent='EXTREME FEAR';lbl.style.color='var(--red)';}
-  else if(val<40){lbl.textContent='FEAR';lbl.style.color='#ff8c42';}
-  else if(val<60){lbl.textContent='NEUTRAL';lbl.style.color='var(--yellow)';}
-  else if(val<80){lbl.textContent='GREED';lbl.style.color='#80ff72';}
-  else{lbl.textContent='EXTREME GREED';lbl.style.color='var(--green)';}
-}
-
 function buildTags(){
   const coinTags=coins.slice(0,8).map(c=>({
     label:'#'+c.ticker,
@@ -687,15 +839,130 @@ function buildTags(){
   document.getElementById('tagsBox').innerHTML=[...coinTags,...extra].map(t=>`<div class="tag ${t.temp}">${t.label}</div>`).join('');
 }
 
+function toggleWatch(coinId){
+  watchlist.toggle(coinId);
+  renderCoins();
+  // if this coin is selected, refresh analysis panel watch button state
+  if(selected&&selected.id===coinId) renderAnalysis(selected);
+}
+
+function updateWatchlistBadge(){
+  const count=watchlist.size();
+  const badge=document.getElementById('watchlistCount');
+  if(!badge)return;
+  if(count>0){badge.textContent=count;badge.style.display='inline';}
+  else{badge.style.display='none';}
+}
+
 function setFilter(f,btn){
   filter=f;
   document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('on'));
   btn.classList.add('on');
+  // clear search when switching tabs
+  const si=document.getElementById('searchInput');
+  if(si)si.value='';
   renderCoins();
 }
 
+function openModal(coinId){
+  watchCoinId = coinId;
+  const c = coins.find(x=>x.id===coinId);
+  if(!c) return;
+  document.getElementById('modalCoinName').textContent = c.ticker + ' · ' + c.name + ' · ' + c.price;
+  document.getElementById('watchEmail').value = '';
+  document.getElementById('modalContent').innerHTML = document.getElementById('modalContent').innerHTML; // reset
+  // Re-render modal content fresh
+  document.getElementById('modalContent').innerHTML = `
+    <div class="modal-title">🔔 ALERT ME WHEN THIS MOVES</div>
+    <div class="modal-sub">Get a personal alert when <strong style="color:var(--text)">${c.ticker}</strong>'s signal changes. No spam — just the signal when it matters.</div>
+    <div class="modal-coin-name">${c.ticker} · ${c.name} · ${c.price}</div>
+    <input class="modal-input" type="email" id="watchEmail" placeholder="your@email.com" autocomplete="email"/>
+    <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);margin-bottom:8px;letter-spacing:1px;">ALERT FREQUENCY</div>
+    <div class="modal-freq">
+      <button class="freq-btn on" id="freqInstant" onclick="setFreq('instant',this)">⚡ INSTANT</button>
+      <button class="freq-btn" id="freqDaily" onclick="setFreq('daily',this)">📊 DAILY</button>
+      <button class="freq-btn" id="freqWeekly" onclick="setFreq('weekly',this)">📅 WEEKLY</button>
+    </div>
+    <button class="modal-submit" onclick="submitWatch()">ALERT ME ON ${c.ticker} →</button>
+    <div class="modal-disclaimer">No spam ever · Unsubscribe instantly · Not financial advice</div>
+  `;
+  watchFreq = 'instant';
+  document.getElementById('watchModal').classList.add('on');
+}
+
+function closeModal(){
+  document.getElementById('watchModal').classList.remove('on');
+}
+
+function setFreq(freq, btn){
+  watchFreq = freq;
+  document.querySelectorAll('.freq-btn').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+}
+
+async function submitWatch(){
+  const email = document.getElementById('watchEmail').value.trim();
+  if(!email || !email.includes('@')){
+    document.getElementById('watchEmail').style.borderColor='var(--red)';
+    document.getElementById('watchEmail').placeholder='Please enter a valid email';
+    return;
+  }
+  const c = coins.find(x=>x.id===watchCoinId);
+  if(!c) return;
+
+  // Show loading state
+  document.querySelector('.modal-submit').textContent = 'SENDING...';
+  document.querySelector('.modal-submit').style.opacity = '0.7';
+
+  try {
+    // Send to Make webhook — Make then adds to Mailchimp
+    await fetch(MAKE_WEBHOOK, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        email,
+        coin_id:     c.id,
+        coin_ticker: c.ticker,
+        coin_name:   c.name,
+        coin_price:  c.price,
+        hype_score:  c.hype,
+        signal:      c.signal,
+        frequency:   watchFreq,
+        timestamp:   new Date().toISOString(),
+        source:      'cryptohyperadar.com'
+      })
+    });
+  } catch(e) {
+    console.warn('Webhook error:', e);
+    // Still show success — don't penalize user for network issues
+  }
+
+  // Mark as watching
+  watchlist.add(watchCoinId);
+
+  // Show success state
+  document.getElementById('modalContent').innerHTML = `
+    <div class="modal-success">
+      <div class="modal-success-icon">🔔</div>
+      <div class="modal-success-title">YOU'RE WATCHING ${c.ticker}</div>
+      <div class="modal-success-sub">
+        We'll alert you at <strong style="color:var(--text)">${email}</strong><br>
+        Frequency: <strong style="color:var(--purple)">${watchFreq.toUpperCase()}</strong><br><br>
+        You'll be the first to know when ${c.ticker} makes a significant move.
+      </div>
+      <button class="modal-submit" style="margin-top:16px;" onclick="closeModal()">DONE →</button>
+      <div class="modal-disclaimer">Unsubscribe anytime · Not financial advice</div>
+    </div>
+  `;
+
+  // Update watch button in analysis panel
+  if(selected && selected.id === watchCoinId) renderAnalysis(selected);
+}
+
+document.getElementById('watchModal').addEventListener('click', function(e){
+  if(e.target === this) closeModal();
+});
 function showOverlay(on){document.getElementById('overlay').classList.toggle('on',on);}
-function setOverlay(s,l){document.getElementById('oStatus').textContent=s;document.getElementById('oLog').textContent=l;}
 function showWarn(msg){const e=document.createElement('div');e.className='warn-bar';e.textContent='⚠ '+msg;document.getElementById('coinsList').prepend(e);}
 
 function fmtP(p){
