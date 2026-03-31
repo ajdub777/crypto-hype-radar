@@ -66,7 +66,20 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
 .coin-card.neutral{border-left-color:var(--yellow);}
 .coin-card.trending{border-left-color:var(--purple);}
 .coin-card:hover{border-color:rgba(0,212,255,.3);background:rgba(0,212,255,.04);transform:translateX(3px);}
-.coin-card.selected{border-color:var(--blue);background:rgba(0,212,255,.06);}
+.coin-card.selected{border-color:var(--blue);background:rgba(0,212,255,.06);border-left-color:var(--blue);box-shadow:inset 3px 0 12px rgba(0,212,255,.15);}
+.coin-card.selected .c-ticker{color:var(--blue);text-shadow:0 0 10px rgba(0,212,255,.5);}
+.selected-indicator{display:none;width:6px;height:6px;border-radius:50%;background:var(--blue);box-shadow:0 0 8px var(--blue);animation:pulse 1s infinite;flex-shrink:0;}
+.coin-card.selected .selected-indicator{display:block;}
+.coin-detail{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);grid-template-columns:repeat(3,1fr);gap:8px;}
+.coin-card.selected .coin-detail{display:grid;}
+.detail-cell{display:flex;flex-direction:column;gap:2px;}
+.detail-lbl{font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;}
+.detail-val{font-family:'Orbitron',monospace;font-size:12px;font-weight:700;color:var(--text);}
+.nav-arrows{display:flex;align-items:center;gap:8px;}
+.nav-btn{background:transparent;border:1px solid var(--border);color:var(--dim);font-family:'Orbitron',monospace;font-size:11px;padding:3px 10px;cursor:pointer;transition:all .15s;}
+.nav-btn:hover{border-color:var(--blue);color:var(--blue);}
+.nav-counter{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);}
+.click-hint{font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--dim);text-align:right;padding:4px 0 0;opacity:.6;}
 .card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
 .coin-id{display:flex;align-items:center;gap:10px;}
 .coin-img{width:28px;height:28px;border-radius:50%;object-fit:cover;}
@@ -225,11 +238,16 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
    <div class="panel">
     <div class="panel-hdr">
      <span class="panel-title">⚡ SIGNAL ANALYSIS</span>
-     <span class="panel-sub" id="analysisLabel">SELECT A COIN</span>
+     <div class="nav-arrows">
+      <button class="nav-btn" onclick="navCoin(-1)">◀</button>
+      <span class="nav-counter" id="navCounter">--</span>
+      <button class="nav-btn" onclick="navCoin(1)">▶</button>
+     </div>
     </div>
     <div class="panel-body">
+     <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--blue);margin-bottom:8px;letter-spacing:1px;" id="analysisLabel">USE ◀ ▶ OR CLICK A COIN</div>
      <div class="analysis-text" id="analysisBox">
-      <div class="thinking"><span>Click any coin for live signal breakdown</span></div>
+      <div class="thinking"><span>Click any coin or use arrows to browse all signals</span></div>
      </div>
     </div>
    </div>
@@ -317,6 +335,15 @@ async function fullScan(){
   document.getElementById('scanBtn').classList.remove('busy');
   document.getElementById('scanBtn').textContent='⟳ RESCAN';
   renderCoins(); updateStats(); buildTags(); setGauge(); renderFeed(null);
+  // auto-select top coin so analysis panel is never empty
+  if(coins.length&&!selected){
+    selected=coins[0];
+    renderCoins();
+    document.getElementById('navCounter').textContent=`1/${coins.length}`;
+    document.getElementById('analysisLabel').textContent=selected.ticker+' · '+selected.name;
+    renderAnalysis(selected);
+    renderFeed(selected);
+  }
   const n=new Date();
   document.getElementById('sTime').textContent=`${pad(n.getUTCHours())}:${pad(n.getUTCMinutes())} UTC`;
 }
@@ -427,6 +454,7 @@ function renderCoins(){
          style="animation:fadeSlide .28s ease ${i*.045}s both">
       <div class="card-top">
         <div class="coin-id">
+          <div class="selected-indicator"></div>
           ${c.image?`<img class="coin-img" src="${c.image}" alt="${c.ticker}" loading="lazy">`:`<div class="coin-img-ph">🪙</div>`}
           <div><div class="c-ticker">${c.ticker}</div><div class="c-name">${c.name}${c.rank?' · #'+c.rank:''}</div></div>
         </div>
@@ -443,6 +471,12 @@ function renderCoins(){
         <div class="badges">${c.badges.map(b=>`<span class="badge ${b}">${bLbl(b)}</span>`).join('')}</div>
         <span class="signal-pill ${c.signal}">${c.signal==='moon'?'🚀 MOON':c.signal==='dump'?'💀 DUMP':c.signal==='trend'?'🔍 TREND':'👀 WATCH'}</span>
       </div>
+      <div class="coin-detail">
+        <div class="detail-cell"><div class="detail-lbl">Market Cap</div><div class="detail-val">${c.mcap}</div></div>
+        <div class="detail-cell"><div class="detail-lbl">Volume 24h</div><div class="detail-val">${c.vol}</div></div>
+        <div class="detail-cell"><div class="detail-lbl">Hype Score</div><div class="detail-val" style="color:${c.hype>75?'var(--green)':c.hype>50?'var(--yellow)':'var(--red)'}">${c.hype}/100</div></div>
+      </div>
+      <div class="click-hint">${selected&&selected.id===c.id?'▶ analysis loaded in panel →':'click to analyse'}</div>
     </div>`).join('');
 }
 
@@ -451,7 +485,27 @@ function bLbl(b){return{'trending-search':'🔍 SEARCH','volume-spike':'⚡ VOL 
 function selectCoin(id){
   selected=coins.find(c=>c.id===id)||null;
   renderCoins();
-  if(selected){renderAnalysis(selected);renderFeed(selected);}
+  if(selected){
+    const idx=coins.indexOf(selected);
+    document.getElementById('navCounter').textContent=`${idx+1}/${coins.length}`;
+    document.getElementById('analysisLabel').textContent=selected.ticker+' · '+selected.name;
+    renderAnalysis(selected);
+    renderFeed(selected);
+    // scroll analysis panel into view on mobile
+    document.getElementById('analysisBox').scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+}
+
+function navCoin(dir){
+  if(!coins.length)return;
+  const idx=selected?coins.indexOf(selected):- 1;
+  const next=(idx+dir+coins.length)%coins.length;
+  selectCoin(coins[next].id);
+  // scroll the newly selected card into view
+  setTimeout(()=>{
+    const cards=document.querySelectorAll('.coin-card');
+    if(cards[next])cards[next].scrollIntoView({behavior:'smooth',block:'nearest'});
+  },50);
 }
 
 function renderAnalysis(c){
