@@ -868,8 +868,6 @@ function openModal(coinId){
   const c = coins.find(x=>x.id===coinId);
   if(!c) return;
   document.getElementById('modalCoinName').textContent = c.ticker + ' · ' + c.name + ' · ' + c.price;
-  document.getElementById('watchEmail').value = '';
-  document.getElementById('modalContent').innerHTML = document.getElementById('modalContent').innerHTML; // reset
   // Re-render modal content fresh
   document.getElementById('modalContent').innerHTML = `
     <div class="modal-title">🔔 ALERT ME WHEN THIS MOVES</div>
