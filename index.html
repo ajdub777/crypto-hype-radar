@@ -423,7 +423,6 @@ let watchFreq = 'daily';
 let watchCoinId = null;
 
 // ── MAKE WEBHOOK URL ─────────────────────────────────────────────────────────
-// Replace this with your actual Make webhook URL once you create the scenario
 const MAKE_WEBHOOK = 'https://hype-radar.cryptohype-radar.workers.dev';
 const SUBS=['CryptoCurrency','SatoshiStreetBets','memecoin','CryptoMoonShots','defi'];
 const HYPE_WORDS=['moon','100x','gem','pump','aping','just launched','bullish','rocket','breakout','degen','rally','mooning','huge','exploding'];
@@ -753,8 +752,8 @@ function renderAnalysis(c){
         <div class="risk-bar"><div class="risk-fill" style="width:${riskPct}%;background:${riskFillColor};"></div></div>
       </div>
       <div class="context-text">${context}</div>
-      <button class="watch-btn ${isWatching?'watching':''}" onclick="openModal('${c.id}')">
-        ${isWatching ? '🔔 WATCHING THIS COIN' : '🔔 ALERT ME WHEN THIS MOVES'}
+      <button class="watch-btn" onclick="openModal('${c.id}')">
+        🔔 ALERT ME WHEN THIS MOVES
       </button>
       <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--dim);margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">⚠ NOT FINANCIAL ADVICE · DYOR · Crypto is high risk</div>`;
     setCoinGauge(c,score);
@@ -917,7 +916,6 @@ async function submitWatch(){
   try {
     await fetch(MAKE_WEBHOOK, {
       method: 'POST',
-      mode: 'no-cors',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         email,
@@ -936,25 +934,28 @@ async function submitWatch(){
     console.warn('Webhook error:', e);
   }
 
-  // Mark as watching
+  // Also add to localStorage watchlist silently
   watchlist.add(watchCoinId);
 
-  // Show success state
+  // Show success — then auto-close after 3 seconds so they can alert more coins
   document.getElementById('modalContent').innerHTML = `
     <div class="modal-success">
       <div class="modal-success-icon">🔔</div>
-      <div class="modal-success-title">YOU'RE WATCHING ${c.ticker}</div>
+      <div class="modal-success-title">YOU'LL BE ALERTED ON ${c.ticker}</div>
       <div class="modal-success-sub">
-        We'll alert you at <strong style="color:var(--text)">${email}</strong><br>
+        Alerts going to <strong style="color:var(--text)">${email}</strong><br>
         Frequency: <strong style="color:var(--purple)">${watchFreq.toUpperCase()}</strong><br><br>
-        You'll be the first to know when ${c.ticker} makes a significant move.
+        Want to watch more coins? Close this and click any other coin.
       </div>
-      <button class="modal-submit" style="margin-top:16px;" onclick="closeModal()">DONE →</button>
+      <button class="modal-submit" style="margin-top:16px;" onclick="closeModal()">DONE — WATCH MORE COINS →</button>
       <div class="modal-disclaimer">Unsubscribe anytime · Not financial advice</div>
     </div>
   `;
 
-  // Update watch button in analysis panel
+  // Auto-close after 4 seconds
+  setTimeout(() => closeModal(), 4000);
+
+  // Update analysis panel
   if(selected && selected.id === watchCoinId) renderAnalysis(selected);
 }
 
