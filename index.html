@@ -424,7 +424,7 @@ let watchCoinId = null;
 
 // ── MAKE WEBHOOK URL ─────────────────────────────────────────────────────────
 // Replace this with your actual Make webhook URL once you create the scenario
-const MAKE_WEBHOOK = 'https://hook.us2.make.com/s7kigp8twu2wv3c33oup12ynsk7irbgw';
+const MAKE_WEBHOOK = 'https://hook.us1.make.com/YOUR_WEBHOOK_ID_HERE';
 const SUBS=['CryptoCurrency','SatoshiStreetBets','memecoin','CryptoMoonShots','defi'];
 const HYPE_WORDS=['moon','100x','gem','pump','aping','just launched','bullish','rocket','breakout','degen','rally','mooning','huge','exploding'];
 const pad=n=>String(n).padStart(2,'0');
@@ -963,6 +963,7 @@ document.getElementById('watchModal').addEventListener('click', function(e){
   if(e.target === this) closeModal();
 });
 function showOverlay(on){document.getElementById('overlay').classList.toggle('on',on);}
+function setOverlay(s,l){document.getElementById('oStatus').textContent=s;document.getElementById('oLog').textContent=l;}
 function showWarn(msg){const e=document.createElement('div');e.className='warn-bar';e.textContent='⚠ '+msg;document.getElementById('coinsList').prepend(e);}
 
 function fmtP(p){
