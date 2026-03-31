@@ -915,27 +915,27 @@ async function submitWatch(){
   document.querySelector('.modal-submit').style.opacity = '0.7';
 
   try {
-    // Send to Make webhook — use no-cors to avoid CORS blocking from GitHub Pages
+    // Use URLSearchParams — bypasses CORS restrictions from GitHub Pages
+    const payload = new URLSearchParams({
+      email,
+      coin_id:     c.id,
+      coin_ticker: c.ticker,
+      coin_name:   c.name,
+      coin_price:  c.price,
+      hype_score:  String(c.hype),
+      signal:      c.signal,
+      frequency:   watchFreq,
+      timestamp:   new Date().toISOString(),
+      source:      'cryptohyperadar.com'
+    });
     await fetch(MAKE_WEBHOOK, {
       method: 'POST',
       mode: 'no-cors',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        email,
-        coin_id:     c.id,
-        coin_ticker: c.ticker,
-        coin_name:   c.name,
-        coin_price:  c.price,
-        hype_score:  c.hype,
-        signal:      c.signal,
-        frequency:   watchFreq,
-        timestamp:   new Date().toISOString(),
-        source:      'cryptohyperadar.com'
-      })
+      headers: {'Content-Type':'application/x-www-form-urlencoded'},
+      body: payload.toString()
     });
   } catch(e) {
     console.warn('Webhook error:', e);
-    // Still show success — don't penalize user for network issues
   }
 
   // Mark as watching
