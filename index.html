@@ -915,9 +915,10 @@ async function submitWatch(){
   document.querySelector('.modal-submit').style.opacity = '0.7';
 
   try {
-    // Send to Make webhook — Make then adds to Mailchimp
+    // Send to Make webhook — use no-cors to avoid CORS blocking from GitHub Pages
     await fetch(MAKE_WEBHOOK, {
       method: 'POST',
+      mode: 'no-cors',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         email,
