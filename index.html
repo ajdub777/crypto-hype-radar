@@ -572,6 +572,39 @@ function crossBoost(){
 
 function hyp(t){const l=t.toLowerCase();return Math.min(HYPE_WORDS.reduce((s,w)=>s+(l.includes(w)?12:0),0),100);}
 
+let searchTimer=null;
+async function searchCoinGecko(q){
+  try{
+    const r=await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(q)}`);
+    if(!r.ok)return[];
+    const d=await r.json();
+    const ids=(d.coins||[]).slice(0,6).map(c=>c.id);
+    if(!ids.length)return[];
+    const r2=await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids.join(',')}&order=market_cap_desc&per_page=6&page=1&sparkline=false&price_change_percentage=24h`);
+    if(!r2.ok)return[];
+    const data=await r2.json();
+    return data.map(coin=>{
+      const ch=coin.price_change_percentage_24h||0;
+      const vol=coin.total_volume||0;
+      const mcap=coin.market_cap||0;
+      const vRatio=mcap>0?Math.min((vol/mcap)*80,40):0;
+      const cBonus=Math.min(Math.abs(ch)*1.2,30);
+      const hype=Math.round(vRatio+cBonus);
+      let type='neutral';
+      if(ch>5)type='bullish';
+      else if(ch<-8)type='bearish';
+      const signal=type==='bullish'?'moon':type==='bearish'?'dump':'watch';
+      const badges=[];
+      if(vol/(mcap||1)>0.3)badges.push('volume-spike');
+      return{id:coin.id,ticker:coin.symbol.toUpperCase(),name:coin.name,image:coin.image,
+        price:fmtP(coin.current_price),priceRaw:coin.current_price,
+        ch24:ch,change:(ch>=0?'+':'')+ch.toFixed(2)+'%',changeDir:ch>=0?'up':'dn',
+        hype:Math.max(5,Math.min(99,hype)),type,signal,badges,
+        mcap:fmtL(mcap),vol:fmtL(vol),rank:coin.market_cap_rank,isTrend:false,isGain:false};
+    });
+  }catch(e){return[];}
+}
+
 function renderCoins(){
   const list=document.getElementById('coinsList');
   const q=document.getElementById('searchInput')?document.getElementById('searchInput').value.trim().toLowerCase():'';
@@ -595,8 +628,47 @@ function renderCoins(){
     return;
   }
 
+  if(!vis.length&&q){
+    list.innerHTML=`<div class="empty" style="color:var(--blue);font-family:'Share Tech Mono',monospace;font-size:11px;text-align:center;padding:24px;">⟳ SEARCHING COINGECKO FOR "${q.toUpperCase()}"...</div>`;
+    if(searchTimer)clearTimeout(searchTimer);
+    searchTimer=setTimeout(async()=>{
+      const results=await searchCoinGecko(q);
+      const currentQ=document.getElementById('searchInput')?document.getElementById('searchInput').value.trim().toLowerCase():'';
+      if(currentQ!==q)return;
+      if(!results.length){
+        list.innerHTML=`<div class="empty">NO COINS FOUND FOR "${q.toUpperCase()}"</div>`;
+        return;
+      }
+      const tempCoins=[...coins,...results.filter(r=>!coins.find(c=>c.id===r.id))];
+      const renderList=tempCoins.filter(c=>c.ticker.toLowerCase().includes(q)||c.name.toLowerCase().includes(q));
+      list.innerHTML=renderList.map((c,i)=>{
+        const isWatched=watchlist.has(c.id);
+        const isSelected=selected&&selected.id===c.id;
+        return`<div class="coin-card ${c.type}${isSelected?' selected':''}" onclick="selectCoinFromSearch('${c.id}',${JSON.stringify(c).replace(/"/g,'&quot;')})" style="animation:fadeSlide .28s ease ${i*.04}s both">
+          <div class="card-top">
+            <div class="coin-id">
+              <div class="selected-indicator"></div>
+              ${c.image?`<img class="coin-img" src="${c.image}" alt="${c.ticker}" loading="lazy">`:`<div class="coin-img-ph">🪙</div>`}
+              <div><div class="c-ticker">${c.ticker}</div><div class="c-name">${c.name}${c.rank?' · #'+c.rank:''}</div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <button onclick="event.stopPropagation();toggleWatch('${c.id}')" style="background:${isWatched?'rgba(191,90,242,.2)':'transparent'};border:1px solid ${isWatched?'var(--purple)':'var(--border)'};color:${isWatched?'var(--purple)':'var(--dim)'};width:28px;height:28px;cursor:pointer;border-radius:4px;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;">🔔</button>
+              <div class="price-block"><div class="c-price">${c.price}</div><div class="c-change ${c.changeDir}">${c.change}</div></div>
+            </div>
+          </div>
+          <div class="card-bot">
+            <div class="hype-wrap"><div class="hype-lbl"><span>HYPE</span><span>${c.hype}/100</span></div><div class="hype-bar"><div class="hype-fill ${c.type==='bullish'?'g':c.type==='bearish'?'r':c.type==='trending'?'p':'y'}" style="width:${c.hype}%"></div></div></div>
+            <div class="badges">${c.badges.map(b=>`<span class="badge ${b}">${bLbl(b)}</span>`).join('')}</div>
+            <span class="signal-pill ${c.signal}">${c.signal==='moon'?'🚀 MOON':c.signal==='dump'?'💀 DUMP':c.signal==='trend'?'🔍 TREND':'👀 WATCH'}</span>
+          </div>
+        </div>`;
+      }).join('');
+    },600);
+    return;
+  }
+
   if(!vis.length){
-    list.innerHTML=`<div class="empty">${q?'NO COINS MATCH "'+q.toUpperCase()+'"':'NO SIGNALS IN THIS CATEGORY'}</div>`;
+    list.innerHTML=`<div class="empty">NO SIGNALS IN THIS CATEGORY</div>`;
     return;
   }
 
@@ -646,6 +718,11 @@ function renderCoins(){
 }
 
 function bLbl(b){return{'trending-search':'🔍 SEARCH','volume-spike':'⚡ VOL SPIKE','gainer':'📈 GAINER','dumping':'📉 LOSER','reddit':'🤖 REDDIT'}[b]||b;}
+
+function selectCoinFromSearch(id, coinData){
+  if(!coins.find(c=>c.id===id)) coins.push(coinData);
+  selectCoin(id);
+}
 
 function selectCoin(id){
   selected=coins.find(c=>c.id===id)||null;
