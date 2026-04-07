@@ -301,6 +301,30 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
 .faq-a a{color:var(--blue);text-decoration:none;}
 .faq-a a:hover{text-shadow:var(--glow-blue);}
 
+/* ── Share signal button (on coin card) ── */
+.share-card-btn{background:transparent;border:1px solid var(--border);color:var(--dim);width:28px;height:28px;cursor:pointer;border-radius:4px;font-size:14px;font-family:'Orbitron',monospace;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;line-height:1;}
+.share-card-btn:hover{border-color:var(--blue);color:var(--blue);background:rgba(0,212,255,.08);}
+
+/* ── Share modal ── */
+.share-modal-backdrop{position:fixed;inset:0;background:rgba(3,7,18,.9);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s;}
+.share-modal-backdrop.on{opacity:1;pointer-events:all;}
+.share-modal{background:var(--surface);border:1px solid var(--blue);width:100%;max-width:460px;margin:20px;padding:24px;position:relative;}
+.share-modal-title{font-family:'Orbitron',monospace;font-size:12px;font-weight:900;color:var(--blue);letter-spacing:2px;margin-bottom:3px;}
+.share-modal-sub{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim);margin-bottom:14px;}
+.share-canvas-wrap{width:100%;border:1px solid var(--border);margin-bottom:14px;line-height:0;position:relative;}
+.share-canvas-wrap canvas{width:100%;height:auto;display:block;}
+.share-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.share-action-btn{background:transparent;font-family:'Orbitron',monospace;font-size:9px;font-weight:700;letter-spacing:1.5px;padding:10px 8px;border:1px solid;cursor:pointer;transition:all .2s;text-align:center;white-space:nowrap;}
+.share-action-btn.x-btn{border-color:rgba(255,255,255,.25);color:var(--text);}
+.share-action-btn.x-btn:hover{background:rgba(255,255,255,.08);border-color:var(--text);}
+.share-action-btn.copy-btn{border-color:rgba(0,212,255,.4);color:var(--blue);}
+.share-action-btn.copy-btn:hover{background:rgba(0,212,255,.1);}
+.share-action-btn.copy-btn.copied{border-color:var(--green);color:var(--green);background:rgba(0,255,136,.08);}
+.share-action-btn.dl-btn{border-color:rgba(191,90,242,.4);color:var(--purple);}
+.share-action-btn.dl-btn:hover{background:rgba(191,90,242,.1);}
+.share-modal-close{position:absolute;top:10px;right:12px;background:transparent;border:none;color:var(--dim);font-size:16px;cursor:pointer;line-height:1;}
+.share-disclaimer{font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--dim);margin-top:10px;text-align:center;opacity:.55;}
+
 /* ── Add-to-Home-Screen prompt ── */
 .a2hs-banner{position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-top:1px solid rgba(0,212,255,0.25);padding:14px 20px;display:flex;align-items:center;gap:14px;transform:translateY(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);box-shadow:0 -8px 32px rgba(0,0,0,.6);}
 .a2hs-banner.visible{transform:translateY(0);}
@@ -345,6 +369,24 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
   <div class="spin-ring"></div>
   <div class="overlay-status" id="oStatus">INITIALIZING...</div>
   <div class="overlay-log" id="oLog"></div>
+</div>
+
+<!-- SHARE SIGNAL MODAL -->
+<div class="share-modal-backdrop" id="shareModal">
+  <div class="share-modal">
+    <button class="share-modal-close" onclick="closeShareModal()">✕</button>
+    <div class="share-modal-title">↗ SHARE SIGNAL</div>
+    <div class="share-modal-sub" id="shareModalSub">Generating card...</div>
+    <div class="share-canvas-wrap">
+      <canvas id="shareCanvas" width="600" height="314"></canvas>
+    </div>
+    <div class="share-actions">
+      <button class="share-action-btn x-btn" id="shareXBtn" onclick="shareToX()">𝕏 POST TO X</button>
+      <button class="share-action-btn copy-btn" id="shareCopyBtn" onclick="copySignalLink()">⎘ COPY LINK</button>
+      <button class="share-action-btn dl-btn" onclick="downloadShareCard()">↓ SAVE IMAGE</button>
+    </div>
+    <div class="share-disclaimer">⚠ Not financial advice · DYOR · Crypto is high risk</div>
+  </div>
 </div>
 
 <!-- EMAIL WATCHLIST MODAL -->
@@ -771,8 +813,10 @@ function updateNotifBtn(permission){
   }
 }
 
-// ── Signal-change tracking ────────────────────────────────────────────────────
+// ── Signal-change tracking + notification thresholds ─────────────────────────
 const SIGNALS_KEY='chr_prev_signals_v2';
+const ALERT_TIMES_KEY='chr_alert_times_v1';
+const ALERT_COOLDOWN_MS=2*60*60*1000; // 2 hours
 
 function getPrevSignals(){
   try{return JSON.parse(localStorage.getItem(SIGNALS_KEY)||'{}');}
@@ -785,30 +829,56 @@ function saveCurrentSignals(){
   localStorage.setItem(SIGNALS_KEY,JSON.stringify(map));
 }
 
+function getAlertTimes(){
+  try{return JSON.parse(localStorage.getItem(ALERT_TIMES_KEY)||'{}');}
+  catch(e){return{};}
+}
+
+function recordAlertTime(coinId){
+  const times=getAlertTimes();
+  times[coinId]=Date.now();
+  localStorage.setItem(ALERT_TIMES_KEY,JSON.stringify(times));
+}
+
 async function checkSignalChanges(){
   if(!('Notification' in window)||Notification.permission!=='granted')return;
   const prev=getPrevSignals();
-  // If no previous data, save baseline silently (no notification on first run)
+  // First run — save baseline silently, no notification
   if(Object.keys(prev).length===0){saveCurrentSignals();return;}
-  const changed=coins.filter(c=>prev[c.id]&&prev[c.id]!==c.signal);
-  // Limit to 3 notifications per scan cycle to avoid spam
-  for(const c of changed.slice(0,3)){
-    await fireSignalNotification(c,prev[c.id]);
+  const alertTimes=getAlertTimes();
+  const now=Date.now();
+
+  // Strict thresholds: only fire when ALL conditions are met
+  const eligible=coins.filter(c=>{
+    // 1. Signal must have actually changed from the previous scan
+    if(!prev[c.id]||prev[c.id]===c.signal)return false;
+    // 2. New signal must be BUY ('moon') — not SELL, HOLD, or TRENDING
+    if(c.signal!=='moon')return false;
+    // 3. Hype score must be above 60
+    if(c.hype<=60)return false;
+    // 4. Same coin must not have triggered an alert in the last 2 hours
+    if(alertTimes[c.id]&&(now-alertTimes[c.id])<ALERT_COOLDOWN_MS)return false;
+    return true;
+  });
+
+  // Cap at 3 per scan cycle to prevent burst spam
+  for(const c of eligible.slice(0,3)){
+    await fireSignalNotification(c);
+    recordAlertTime(c.id);
   }
   saveCurrentSignals();
 }
 
-async function fireSignalNotification(coin,prevSignal){
-  const signalLabel={moon:'🚀 BUY',dump:'💀 SELL',trend:'🔍 TRENDING',watch:'👀 HOLD'};
-  const title=`${coin.ticker} Signal Changed`;
-  const body=`${signalLabel[prevSignal]||prevSignal.toUpperCase()} → ${signalLabel[coin.signal]||coin.signal.toUpperCase()} · Hype ${coin.hype}/100 · ${coin.change}`;
+async function fireSignalNotification(coin){
+  const title=`🚀 ${coin.ticker} — New BUY Signal`;
+  const body=`${coin.name} · Hype ${coin.hype}/100 · ${coin.change} · New BUY signal detected`;
   try{
-    // Prefer SW-backed showNotification — works on mobile
+    // SW-backed showNotification — the only approach that works on mobile
     const reg=await navigator.serviceWorker.ready;
     await reg.showNotification(title,{
       body,
-      icon:'/favicon.ico',
-      badge:'/favicon.ico',
+      icon:'/icons/icon-192.png',
+      badge:'/icons/icon-192.png',
       vibrate:[200,100,200],
       tag:'signal-'+coin.id,
       renotify:true,
@@ -817,9 +887,220 @@ async function fireSignalNotification(coin,prevSignal){
     });
   }catch(e){
     console.warn('[CHR] SW notification failed, trying fallback:',e);
-    try{new Notification(title,{body,icon:'/favicon.ico'});}
+    try{new Notification(title,{body,icon:'/icons/icon-192.png'});}
     catch(e2){console.warn('[CHR] Fallback notification also failed:',e2);}
   }
+}
+
+// ── Share Signal ─────────────────────────────────────────────────────────────
+let shareCoin=null;
+
+const SIG_COLORS={moon:'#00ff88',dump:'#ff2d55',trend:'#bf5af2',watch:'#ffd60a'};
+const SIG_LABELS={moon:'🚀 BUY',dump:'💀 SELL',trend:'🔍 TRENDING',watch:'👀 HOLD'};
+const SIG_BG={moon:'rgba(0,255,136,0.1)',dump:'rgba(255,45,85,0.1)',trend:'rgba(191,90,242,0.1)',watch:'rgba(255,214,10,0.1)'};
+
+async function openShareModal(coinId){
+  shareCoin=coins.find(c=>c.id===coinId)||null;
+  if(!shareCoin)return;
+  const sub=document.getElementById('shareModalSub');
+  if(sub)sub.textContent=shareCoin.ticker+' · '+shareCoin.name;
+  document.getElementById('shareModal').classList.add('on');
+  // Reset copy button
+  const copyBtn=document.getElementById('shareCopyBtn');
+  if(copyBtn){copyBtn.textContent='⎘ COPY LINK';copyBtn.classList.remove('copied');}
+  // Draw after fonts are loaded
+  await document.fonts.ready;
+  drawShareCard(shareCoin);
+}
+
+function closeShareModal(){
+  document.getElementById('shareModal').classList.remove('on');
+  shareCoin=null;
+}
+
+document.getElementById('shareModal').addEventListener('click',function(e){if(e.target===this)closeShareModal();});
+
+function drawShareCard(c){
+  const canvas=document.getElementById('shareCanvas');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  const sigColor=SIG_COLORS[c.signal]||'#ffd60a';
+  const sigLabel=(SIG_LABELS[c.signal]||c.signal).replace(/^\S+\s/,''); // strip emoji for big text
+
+  // ── Background ──
+  ctx.fillStyle='#030712';
+  ctx.fillRect(0,0,W,H);
+
+  // ── Subtle grid ──
+  ctx.strokeStyle='rgba(0,212,255,0.04)';
+  ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+  // ── Left accent bar ──
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,sigColor);
+  grad.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,4,H);
+
+  // ── Radar rings (top-right decoration) ──
+  const rx=W-54,ry=54;
+  [38,26,14].forEach((r,i)=>{
+    ctx.beginPath();
+    ctx.arc(rx,ry,r,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(0,212,255,${0.12+i*0.08})`;
+    ctx.lineWidth=1;
+    ctx.stroke();
+  });
+  // Radar sweep line
+  ctx.beginPath();
+  ctx.moveTo(rx,ry);
+  ctx.lineTo(rx+26*Math.cos(-Math.PI/4),ry+26*Math.sin(-Math.PI/4));
+  ctx.strokeStyle='rgba(0,255,136,0.7)';
+  ctx.lineWidth=1.5;
+  ctx.stroke();
+  // Center dot
+  ctx.beginPath();
+  ctx.arc(rx,ry,3,0,Math.PI*2);
+  ctx.fillStyle='#00d4ff';
+  ctx.fill();
+
+  // ── Top branding ──
+  ctx.font='bold 11px Orbitron, monospace';
+  ctx.fillStyle='rgba(0,212,255,0.6)';
+  ctx.fillText('CRYPTO HYPE RADAR',28,36);
+
+  // ── Coin ticker ──
+  ctx.font='bold 42px Orbitron, monospace';
+  ctx.fillStyle='#e2e8f0';
+  ctx.fillText('$'+c.ticker,28,96);
+
+  // ── Coin full name ──
+  ctx.font='500 15px Rajdhani, sans-serif';
+  ctx.fillStyle='#64748b';
+  ctx.fillText(c.name+(c.rank?' · Rank #'+c.rank:''),30,118);
+
+  // ── Signal box ──
+  const boxX=28,boxY=136,boxW=220,boxH=66;
+  ctx.fillStyle=SIG_BG[c.signal]||'rgba(255,214,10,0.1)';
+  ctx.fillRect(boxX,boxY,boxW,boxH);
+  ctx.strokeStyle=sigColor;
+  ctx.lineWidth=1.5;
+  ctx.strokeRect(boxX,boxY,boxW,boxH);
+  // Signal emoji
+  ctx.font='26px sans-serif';
+  ctx.fillText(SIG_LABELS[c.signal]?.split(' ')[0]||'',boxX+14,boxY+44);
+  // Signal word
+  ctx.font='bold 32px Orbitron, monospace';
+  ctx.fillStyle=sigColor;
+  ctx.shadowColor=sigColor;
+  ctx.shadowBlur=14;
+  ctx.fillText(sigLabel,boxX+52,boxY+44);
+  ctx.shadowBlur=0;
+
+  // ── Price & Change (right of signal box) ──
+  const priceX=boxX+boxW+24;
+  ctx.font='bold 10px Orbitron, monospace';
+  ctx.fillStyle='#64748b';
+  ctx.fillText('PRICE',priceX,boxY+18);
+  ctx.font='bold 18px Share Tech Mono, monospace';
+  ctx.fillStyle='#e2e8f0';
+  ctx.fillText(c.price,priceX,boxY+40);
+  ctx.font='bold 13px Orbitron, monospace';
+  ctx.fillStyle=c.changeDir==='up'?'#00ff88':'#ff2d55';
+  ctx.fillText(c.change,priceX,boxY+60);
+
+  // ── Hype score label + bar ──
+  const barY=226;
+  ctx.font='bold 9px Orbitron, monospace';
+  ctx.fillStyle='#64748b';
+  ctx.fillText('HYPE SCORE',28,barY);
+  ctx.font='bold 9px Orbitron, monospace';
+  ctx.fillStyle=sigColor;
+  ctx.fillText(c.hype+'/100',W-60,barY);
+  // Bar track
+  ctx.fillStyle='rgba(255,255,255,0.06)';
+  ctx.fillRect(28,barY+8,W-56,8);
+  // Bar fill
+  const fillGrad=ctx.createLinearGradient(28,0,28+(W-56)*(c.hype/100),0);
+  fillGrad.addColorStop(0,sigColor);
+  fillGrad.addColorStop(1,sigColor+'99');
+  ctx.fillStyle=fillGrad;
+  ctx.fillRect(28,barY+8,(W-56)*(c.hype/100),8);
+
+  // ── Badges ──
+  if(c.badges&&c.badges.length){
+    const bLbls={'trending-search':'SEARCH','volume-spike':'VOL SPIKE','gainer':'GAINER','dumping':'LOSER','reddit':'REDDIT'};
+    let bx=28;
+    const by=256;
+    c.badges.slice(0,4).forEach(b=>{
+      const label=bLbls[b]||b;
+      ctx.font='bold 8px Share Tech Mono, monospace';
+      const tw=ctx.measureText(label).width;
+      const bw=tw+16;
+      ctx.fillStyle='rgba(255,255,255,0.05)';
+      ctx.fillRect(bx,by,bw,16);
+      ctx.strokeStyle='rgba(255,255,255,0.12)';
+      ctx.lineWidth=1;
+      ctx.strokeRect(bx,by,bw,16);
+      ctx.fillStyle='#94a3b8';
+      ctx.fillText(label,bx+8,by+11);
+      bx+=bw+6;
+    });
+  }
+
+  // ── Bottom rule ──
+  ctx.strokeStyle='rgba(0,212,255,0.15)';
+  ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(28,H-34);
+  ctx.lineTo(W-28,H-34);
+  ctx.stroke();
+
+  // ── Footer ──
+  ctx.font='bold 10px Orbitron, monospace';
+  ctx.fillStyle='rgba(0,212,255,0.5)';
+  ctx.fillText('cryptohyperadar.com',28,H-14);
+  ctx.font='9px Share Tech Mono, monospace';
+  ctx.fillStyle='rgba(100,116,139,0.7)';
+  ctx.textAlign='right';
+  ctx.fillText('⚠ NOT FINANCIAL ADVICE · DYOR',W-28,H-14);
+  ctx.textAlign='left';
+}
+
+function shareToX(){
+  if(!shareCoin)return;
+  const sig=SIG_LABELS[shareCoin.signal]||shareCoin.signal.toUpperCase();
+  const text=`${sig} — $${shareCoin.ticker} is on my radar 🔥\n\nHype Score: ${shareCoin.hype}/100 · ${shareCoin.change} in 24h\n\ncryptohyperadar.com #crypto #${shareCoin.ticker} #CryptoHypeRadar`;
+  window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent(text),'_blank','noopener,noreferrer');
+}
+
+async function copySignalLink(){
+  const btn=document.getElementById('shareCopyBtn');
+  const url=`https://cryptohyperadar.com/?coin=${shareCoin?shareCoin.id:''}`;
+  try{
+    await navigator.clipboard.writeText(url);
+    if(btn){btn.textContent='✓ COPIED!';btn.classList.add('copied');}
+    setTimeout(()=>{if(btn){btn.textContent='⎘ COPY LINK';btn.classList.remove('copied');}},2200);
+  }catch(e){
+    // Fallback for browsers that block clipboard
+    const ta=document.createElement('textarea');
+    ta.value=url;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();document.execCommand('copy');
+    document.body.removeChild(ta);
+    if(btn){btn.textContent='✓ COPIED!';btn.classList.add('copied');}
+    setTimeout(()=>{if(btn){btn.textContent='⎘ COPY LINK';btn.classList.remove('copied');}},2200);
+  }
+}
+
+function downloadShareCard(){
+  if(!shareCoin)return;
+  const canvas=document.getElementById('shareCanvas');
+  const a=document.createElement('a');
+  a.download=`${shareCoin.ticker}-${shareCoin.signal}-signal.png`;
+  a.href=canvas.toDataURL('image/png');
+  a.click();
 }
 
 // ── FAQ accordion ─────────────────────────────────────────────────────────────
@@ -1015,7 +1296,8 @@ function renderCoins(){
             <div class="c-name">${c.name}${c.rank?' · #'+c.rank:''}</div>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button onclick="event.stopPropagation();openShareModal('${c.id}')" title="Share signal" class="share-card-btn">↗</button>
           <button onclick="event.stopPropagation();toggleWatch('${c.id}')" title="${isWatched?'Remove from watchlist':'Add to watchlist'}"
             style="background:${isWatched?'rgba(191,90,242,.2)':'transparent'};border:1px solid ${isWatched?'var(--purple)':'var(--border)'};color:${isWatched?'var(--purple)':'var(--dim)'};width:28px;height:28px;cursor:pointer;border-radius:4px;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;">
             🔔
