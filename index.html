@@ -2,9 +2,41 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Crypto Hype Radar — Real-Time BUY/SELL/HOLD Signals</title>
 <meta name="description" content="Crypto Hype Radar scans CoinGecko, Reddit, and social signals in real time to generate BUY, SELL, and HOLD recommendations — before the hype peaks.">
+
+<!-- PWA manifest -->
+<link rel="manifest" href="/manifest.json">
+
+<!-- Theme color (Android Chrome + Safari 15+) -->
+<meta name="theme-color" content="#030712">
+<meta name="color-scheme" content="dark">
+
+<!-- iOS PWA support -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HypeRadar">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+
+<!-- iOS splash screens (portrait) -->
+<meta name="apple-mobile-web-app-orientations" content="portrait">
+
+<!-- Favicon -->
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+
+<!-- Open Graph / share preview -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Crypto Hype Radar — Real-Time BUY/SELL/HOLD Signals">
+<meta property="og:description" content="Live CoinGecko + Reddit signals. Catch the pump before it peaks.">
+<meta property="og:image" content="https://cryptohyperadar.com/icons/icon-512.png">
+<meta property="og:url" content="https://cryptohyperadar.com">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Crypto Hype Radar">
+<meta name="twitter:description" content="Real-time BUY/SELL/HOLD signals. Live CoinGecko + Reddit.">
+<meta name="twitter:image" content="https://cryptohyperadar.com/icons/icon-512.png">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -269,6 +301,24 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
 .faq-a a{color:var(--blue);text-decoration:none;}
 .faq-a a:hover{text-shadow:var(--glow-blue);}
 
+/* ── Add-to-Home-Screen prompt ── */
+.a2hs-banner{position:fixed;bottom:0;left:0;right:0;z-index:1000;background:var(--surface);border-top:1px solid rgba(0,212,255,0.25);padding:14px 20px;display:flex;align-items:center;gap:14px;transform:translateY(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);box-shadow:0 -8px 32px rgba(0,0,0,.6);}
+.a2hs-banner.visible{transform:translateY(0);}
+.a2hs-icon{width:44px;height:44px;border-radius:10px;flex-shrink:0;object-fit:cover;border:1px solid rgba(0,212,255,.2);}
+.a2hs-text{flex:1;min-width:0;}
+.a2hs-title{font-family:'Orbitron',monospace;font-size:11px;font-weight:700;color:var(--blue);letter-spacing:1.5px;margin-bottom:3px;}
+.a2hs-sub{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim);line-height:1.5;}
+.a2hs-sub strong{color:var(--text);}
+.a2hs-actions{display:flex;gap:8px;flex-shrink:0;}
+.a2hs-install{background:var(--blue);color:var(--bg);font-family:'Orbitron',monospace;font-size:9px;font-weight:700;letter-spacing:1.5px;padding:8px 14px;border:none;cursor:pointer;clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);transition:filter .2s;white-space:nowrap;}
+.a2hs-install:hover{filter:brightness(1.15);}
+.a2hs-dismiss{background:transparent;border:1px solid var(--border);color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:10px;padding:8px 10px;cursor:pointer;transition:all .15s;}
+.a2hs-dismiss:hover{border-color:var(--dim);color:var(--text);}
+/* iOS-specific instruction banner */
+.a2hs-ios-arrow{font-size:20px;animation:bounce .9s ease infinite;}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@media(max-width:480px){.a2hs-banner{padding:12px 14px;gap:10px;}.a2hs-actions{flex-direction:column;}.a2hs-install,.a2hs-dismiss{font-size:8px;padding:7px 10px;}}
+
 /* ── Footer disclaimer ── */
 .site-footer{border-top:1px solid var(--border);padding:18px 0;margin-top:0;}
 .footer-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:1px;}
@@ -277,6 +327,19 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
 </style>
 </head>
 <body>
+
+<!-- ADD TO HOME SCREEN BANNER -->
+<div class="a2hs-banner" id="a2hsBanner" role="banner" aria-label="Install app prompt">
+  <img class="a2hs-icon" src="/icons/icon-192.png" alt="Crypto Hype Radar icon">
+  <div class="a2hs-text">
+    <div class="a2hs-title" id="a2hsTitle">ADD TO HOME SCREEN</div>
+    <div class="a2hs-sub" id="a2hsSub">Install <strong>HypeRadar</strong> for push alerts &amp; fast access — no App Store needed.</div>
+  </div>
+  <div class="a2hs-actions">
+    <button class="a2hs-install" id="a2hsInstallBtn">INSTALL ↓</button>
+    <button class="a2hs-dismiss" id="a2hsDismissBtn" aria-label="Dismiss">✕</button>
+  </div>
+</div>
 
 <div class="overlay" id="overlay">
   <div class="spin-ring"></div>
@@ -575,6 +638,103 @@ if('serviceWorker' in navigator){
   });
 }
 
+// ── PWA: Add to Home Screen prompt ───────────────────────────────────────────
+const A2HS_KEY='chr_a2hs_v1';
+const VISIT_KEY='chr_visit_count_v1';
+let deferredInstallPrompt=null;
+
+// Detect iOS (Safari/Chrome on iOS — no beforeinstallprompt support)
+const isIos=()=>/iphone|ipad|ipod/i.test(navigator.userAgent);
+const isInStandaloneMode=()=>
+  window.matchMedia('(display-mode: standalone)').matches||
+  window.navigator.standalone===true;
+
+// Capture the native Android/Chrome install prompt
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();
+  deferredInstallPrompt=e;
+  maybeShowA2HS();
+});
+
+// If app was successfully installed via native prompt, hide the banner
+window.addEventListener('appinstalled',()=>{
+  dismissA2HS(true);
+  console.log('[CHR] PWA installed successfully');
+});
+
+function maybeShowA2HS(){
+  // Never show if already running as installed PWA
+  if(isInStandaloneMode())return;
+  // Never show if user permanently dismissed
+  const state=JSON.parse(localStorage.getItem(A2HS_KEY)||'{}');
+  if(state.dismissed)return;
+  // Track visit count — show on 2nd+ visit
+  let visits=parseInt(localStorage.getItem(VISIT_KEY)||'0',10);
+  visits++;
+  localStorage.setItem(VISIT_KEY,visits);
+  if(visits<2)return;
+  // Show after a short delay so the page is loaded first
+  setTimeout(()=>showA2HSBanner(),2200);
+}
+
+function showA2HSBanner(){
+  const banner=document.getElementById('a2hsBanner');
+  const installBtn=document.getElementById('a2hsInstallBtn');
+  const title=document.getElementById('a2hsTitle');
+  const sub=document.getElementById('a2hsSub');
+  if(!banner)return;
+
+  if(isIos()&&!isInStandaloneMode()){
+    // iOS can't use beforeinstallprompt — show manual instruction
+    title.textContent='ADD TO HOME SCREEN';
+    sub.innerHTML='Tap <strong style="color:var(--blue)">Share ↑</strong> then <strong style="color:var(--text)">"Add to Home Screen"</strong> to enable push alerts on iOS 16.4+.';
+    installBtn.innerHTML='<span class="a2hs-ios-arrow">⬆</span> SHARE';
+    installBtn.onclick=()=>dismissA2HS(false); // Just dismiss — iOS handles it manually
+  }else if(deferredInstallPrompt){
+    // Android / Chrome — native install prompt available
+    title.textContent='INSTALL APP';
+    sub.innerHTML='Add <strong>HypeRadar</strong> to your home screen for instant signals &amp; push alerts — no App Store.';
+    installBtn.textContent='INSTALL →';
+    installBtn.onclick=triggerInstall;
+  }else{
+    // Fallback: browser doesn't support prompt (Firefox, etc.)
+    return; // Don't show a useless banner
+  }
+
+  document.getElementById('a2hsDismissBtn').onclick=()=>dismissA2HS(false);
+  banner.classList.add('visible');
+}
+
+async function triggerInstall(){
+  if(!deferredInstallPrompt)return;
+  deferredInstallPrompt.prompt();
+  const{outcome}=await deferredInstallPrompt.userChoice;
+  console.log('[CHR] A2HS outcome:',outcome);
+  deferredInstallPrompt=null;
+  dismissA2HS(outcome==='accepted');
+}
+
+function dismissA2HS(permanent=false){
+  const banner=document.getElementById('a2hsBanner');
+  if(banner)banner.classList.remove('visible');
+  if(permanent){
+    localStorage.setItem(A2HS_KEY,JSON.stringify({dismissed:true,installedAt:Date.now()}));
+  }
+}
+
+// Handle ?action=scan shortcut from manifest shortcuts
+if(new URLSearchParams(location.search).get('action')==='scan'){
+  window.addEventListener('load',()=>setTimeout(fullScan,800));
+}
+// Handle ?filter=watchlist shortcut
+if(new URLSearchParams(location.search).get('filter')==='watchlist'){
+  window.addEventListener('load',()=>{
+    filter='watchlist';
+    const btn=document.getElementById('watchlistFilterBtn');
+    if(btn){document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+  });
+}
+
 // ── Notification permission ──────────────────────────────────────────────────
 async function requestNotificationPermission(){
   if(!('Notification' in window)){
@@ -675,6 +835,8 @@ window.addEventListener('load',()=>{
   updateWatchlistBadge();
   // Restore notification button state from browser permission
   if('Notification' in window)updateNotifBtn(Notification.permission);
+  // Show A2HS on iOS (beforeinstallprompt never fires there)
+  if(isIos()&&!isInStandaloneMode())maybeShowA2HS();
   fullScan();setInterval(fullScan,5*60*1000);
 });
 
