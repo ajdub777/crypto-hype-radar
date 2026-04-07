@@ -330,6 +330,16 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
 /* ── Sparkline ── */
 .sparkline{display:block;margin-bottom:3px;opacity:.85;}
 
+/* ── 7-day chart in analysis panel ── */
+.price-chart-section{background:rgba(0,0,0,.25);border:1px solid var(--border);padding:10px 12px;margin-bottom:10px;}
+.price-chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.price-chart-lbl{font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--dim);letter-spacing:1px;}
+.price-chart-7d{font-family:'Orbitron',monospace;font-size:9px;font-weight:700;}
+.week-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:6px;}
+.wstat{text-align:center;padding:4px 2px;background:rgba(255,255,255,.02);border:1px solid var(--border);}
+.wstat-lbl{font-family:'Share Tech Mono',monospace;font-size:7px;color:var(--dim);letter-spacing:.8px;margin-bottom:2px;}
+.wstat-val{font-family:'Orbitron',monospace;font-size:8px;font-weight:700;}
+
 /* ── Share signal button (on coin card) ── */
 .share-card-btn{background:transparent;border:1px solid var(--border);color:var(--dim);width:28px;height:28px;cursor:pointer;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;padding:0;}
 .share-card-btn:hover{border-color:var(--blue);color:var(--blue);background:rgba(0,212,255,.08);}
@@ -1250,9 +1260,10 @@ async function fetchMarketData(allIds,trendIds,gainerIds){
       const cBonus=Math.min(Math.abs(ch)*1.2,30);
       const hype=Math.round(tBonus+vRatio+cBonus);
       let type='neutral';
-      if(isTrend&&ch>0)type='trending';
-      else if(ch>5||(isGain&&ch>0))type='bullish';
+      // BUG FIX: bullish/bearish take priority; trending is a fallback for mildly positive coins only
+      if(ch>5||(isGain&&ch>0))type='bullish';
       else if(ch<-8)type='bearish';
+      else if(isTrend&&ch>0)type='trending';
       const signal=type==='trending'?'trend':type==='bullish'?'moon':type==='bearish'?'dump':'watch';
       const badges=[];
       if(isTrend)badges.push('trending-search');
@@ -1383,7 +1394,7 @@ function renderCoins(){
   }).join('');
 }
 
-function bLbl(b){return{'trending-search':'🔍 SEARCH','volume-spike':'⚡ VOL SPIKE','gainer':'📈 GAINER','dumping':'📉 LOSER','reddit':'🤖 REDDIT'}[b]||b;}
+function bLbl(b){return{'trending-search':'📡 TRENDING','volume-spike':'⚡ VOL SPIKE','gainer':'📈 GAINER','dumping':'📉 LOSER','reddit':'🤖 REDDIT'}[b]||b;}
 
 // ── Sparkline SVG generator ───────────────────────────────────────────────────
 function makeSparklineSVG(prices,isUp){
@@ -1402,6 +1413,26 @@ function makeSparklineSVG(prices,isUp){
   const col=isUp?'#00ff88':'#ff2d55';
   const fillId='sf'+Math.random().toString(36).slice(2,6);
   return`<svg class="sparkline" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="${fillId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${col}" stop-opacity=".25"/><stop offset="100%" stop-color="${col}" stop-opacity="0"/></linearGradient></defs><polyline points="${coords}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+// ── Large sparkline for analysis panel ───────────────────────────────────────
+function makeLargeSparklineSVG(prices,isUp){
+  if(!prices||prices.length<4)return'';
+  const step=Math.max(1,Math.floor(prices.length/80));
+  const pts=prices.filter((_,i)=>i%step===0);
+  const W=240,H=52;
+  const min=Math.min(...pts),max=Math.max(...pts);
+  const range=max-min||1;
+  const toX=(i)=>((i/(pts.length-1))*W).toFixed(1);
+  const toY=(p)=>(H-((p-min)/range)*(H-6)-3).toFixed(1);
+  const coords=pts.map((p,i)=>`${toX(i)},${toY(p)}`).join(' ');
+  const col=isUp?'#00ff88':'#ff2d55';
+  const fillId='lsf'+Math.random().toString(36).slice(2,6);
+  return`<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;">
+    <defs><linearGradient id="${fillId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${col}" stop-opacity=".18"/><stop offset="100%" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    <polygon points="0,${H} ${coords} ${W},${H}" fill="url(#${fillId})"/>
+    <polyline points="${coords}" fill="none" stroke="${col}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
 }
 
 // ── Sort ──────────────────────────────────────────────────────────────────────
@@ -1490,6 +1521,41 @@ function renderAnalysis(c){
       riskLevel='MODERATE RISK';riskColor='var(--yellow)';riskPct=45;
       context=`<span class='y hi'>Hold / Watch signal.</span> ${c.ticker} consolidating — <span class='hi'>${ch>=0?'+':''}${ch.toFixed(1)}%</span> in 24h, hype <span class='y'>${hype}/100</span>.${isTrend?' Trending search suggests awareness is growing.':''} <span class='y'>Watch for a volume spike as the breakout trigger before entering.</span>`;
     }
+    // ── 7-day chart data ─────────────────────────────────────────────────────
+    const sp=c.sparkline||[];
+    let sparkSection='';
+    if(sp.length>10){
+      const week7high=Math.max(...sp);
+      const week7low=Math.min(...sp);
+      const week7pct=((sp[sp.length-1]-sp[0])/sp[0])*100;
+      const third=Math.floor(sp.length/3);
+      const avgFirst=sp.slice(0,third).reduce((a,b)=>a+b,0)/third;
+      const avgLast=sp.slice(-third).reduce((a,b)=>a+b,0)/third;
+      const trendPct=((avgLast-avgFirst)/avgFirst)*100;
+      let trendLabel,trendColor;
+      if(trendPct>15){trendLabel='↗ SURGING';trendColor='var(--green)';}
+      else if(trendPct>5){trendLabel='↗ RISING';trendColor='#80ff72';}
+      else if(trendPct>-5){trendLabel='→ FLAT';trendColor='var(--yellow)';}
+      else if(trendPct>-15){trendLabel='↘ DECLINING';trendColor='#ff8c42';}
+      else{trendLabel='↘ DUMPING';trendColor='var(--red)';}
+      const rangeStr=((week7high-week7low)/week7low*100).toFixed(0)+'%';
+      const pctColor=week7pct>=0?'var(--green)':'var(--red)';
+      sparkSection=`
+      <div class="price-chart-section">
+        <div class="price-chart-header">
+          <span class="price-chart-lbl">7-DAY PRICE CHART</span>
+          <span class="price-chart-7d" style="color:${pctColor}">${week7pct>=0?'+':''}${week7pct.toFixed(1)}% 7D</span>
+        </div>
+        ${makeLargeSparklineSVG(sp,week7pct>=0)}
+        <div class="week-stats">
+          <div class="wstat"><div class="wstat-lbl">7D HIGH</div><div class="wstat-val" style="color:var(--green)">${fmtP(week7high)}</div></div>
+          <div class="wstat"><div class="wstat-lbl">7D LOW</div><div class="wstat-val" style="color:var(--red)">${fmtP(week7low)}</div></div>
+          <div class="wstat"><div class="wstat-lbl">RANGE</div><div class="wstat-val" style="color:var(--text)">${rangeStr}</div></div>
+          <div class="wstat"><div class="wstat-lbl">TREND</div><div class="wstat-val" style="color:${trendColor}">${trendLabel}</div></div>
+        </div>
+      </div>`;
+    }
+
     const price=c.priceRaw;
     let tpMult,slMult;
     if(score>=4){tpMult=1.65;slMult=0.80;}
@@ -1512,6 +1578,7 @@ function renderAnalysis(c){
         <div class="dmeta-cell"><div class="dmeta-lbl">Hype Score</div><div class="dmeta-val ${hype>70?'g':hype>45?'y':'r'}">${hype}/100</div></div>
         <div class="dmeta-cell"><div class="dmeta-lbl">Mcap</div><div class="dmeta-val">${c.mcap}</div></div>
       </div>
+      ${sparkSection}
       <div class="tp-sl-grid">
         <div class="tp-cell tp">
           <div class="tp-lbl">🎯 Take Profit</div>
