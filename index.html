@@ -81,7 +81,16 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
 .legend-item{display:flex;align-items:center;gap:5px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim);}
 .legend-dot{width:6px;height:6px;border-radius:50%;}
 .main-grid{display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start;}
-.filter-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+.filter-bar{display:flex;gap:8px;margin-bottom:14px;align-items:center;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px;}
+.filter-bar::-webkit-scrollbar{display:none;}
+/* Sort control */
+.sort-wrap{display:flex;align-items:center;gap:6px;margin-bottom:14px;flex-shrink:0;}
+.sort-lbl{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim);letter-spacing:1px;white-space:nowrap;}
+.sort-sel{background:var(--surface);border:1px solid var(--border);color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:10px;padding:4px 8px;cursor:pointer;outline:none;transition:border-color .15s;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2364748b'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:22px;}
+.sort-sel:focus,.sort-sel:hover{border-color:var(--blue);color:var(--text);}
+.filter-sort-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;}
+.filter-sort-row .filter-bar{margin-bottom:0;flex:1;min-width:0;}
+.filter-sort-row .sort-wrap{margin-bottom:0;}
 .filter-lbl{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim);letter-spacing:1px;}
 .fbtn{background:transparent;border:1px solid var(--border);color:var(--dim);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;padding:4px 12px;cursor:pointer;transition:all .15s;}
 .fbtn.on{border-color:var(--blue);color:var(--blue);background:rgba(0,212,255,.08);}
@@ -242,7 +251,16 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
 ::-webkit-scrollbar-track{background:var(--bg);}
 ::-webkit-scrollbar-thumb{background:var(--border);}
 @media(max-width:900px){.main-grid{grid-template-columns:1fr;}.stats-bar{grid-template-columns:repeat(3,1fr);}}
-@media(max-width:540px){.stats-bar{grid-template-columns:repeat(2,1fr);}}
+/* BUG FIX: keep stats at 3-col on small phones so 5th item never gets a half-width orphan row */
+/* BUG FIX: keep features at 2-col on small phones so it doesn't become a single endless column */
+@media(max-width:540px){
+  .stats-bar{grid-template-columns:repeat(3,1fr);}
+  .features-grid{grid-template-columns:repeat(2,1fr);}
+  .feature-card{padding:14px 12px;}
+  .feature-icon{font-size:20px;margin-bottom:8px;}
+  .feature-title{font-size:9px;letter-spacing:1px;margin-bottom:5px;}
+  .feature-desc{font-size:9.5px;line-height:1.55;}
+}
 
 /* ── Typography polish ── */
 .logo-text h1{letter-spacing:3px;font-size:21px;}
@@ -285,7 +303,7 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
 .feature-desc{font-family:'Share Tech Mono',monospace;font-size:10.5px;color:var(--dim);line-height:1.65;}
 .feature-desc strong{color:var(--text);font-weight:400;}
 @media(max-width:900px){.features-grid{grid-template-columns:repeat(2,1fr);}}
-@media(max-width:540px){.features-grid{grid-template-columns:1fr;}}
+/* old 1-col features rule removed — 2-col override now in the consolidated 540px block above */
 
 /* ── FAQ section ── */
 .faq-section{padding:32px 0 52px;}
@@ -309,9 +327,13 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
 .trade-btn-arrow{font-size:11px;transition:transform .2s;}
 .trade-btn:hover .trade-btn-arrow{transform:translateX(3px);}
 
+/* ── Sparkline ── */
+.sparkline{display:block;margin-bottom:3px;opacity:.85;}
+
 /* ── Share signal button (on coin card) ── */
-.share-card-btn{background:transparent;border:1px solid var(--border);color:var(--dim);width:28px;height:28px;cursor:pointer;border-radius:4px;font-size:14px;font-family:'Orbitron',monospace;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;line-height:1;}
+.share-card-btn{background:transparent;border:1px solid var(--border);color:var(--dim);width:28px;height:28px;cursor:pointer;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;padding:0;}
 .share-card-btn:hover{border-color:var(--blue);color:var(--blue);background:rgba(0,212,255,.08);}
+.share-card-btn svg{pointer-events:none;}
 
 /* ── Share modal ── */
 .share-modal-backdrop{position:fixed;inset:0;background:rgba(3,7,18,.9);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s;}
@@ -484,14 +506,25 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
  <div class="main-grid">
 
   <div>
-   <div class="filter-bar">
-    <span class="filter-lbl">FILTER:</span>
-    <button class="fbtn on" onclick="setFilter('all',this)">ALL</button>
-    <button class="fbtn" onclick="setFilter('trending',this)">🔍 TRENDING</button>
-    <button class="fbtn" onclick="setFilter('bullish',this)">🚀 MOONING</button>
-    <button class="fbtn" onclick="setFilter('bearish',this)">💀 DUMPING</button>
-    <button class="fbtn" onclick="setFilter('neutral',this)">👀 WATCH</button>
-    <button class="fbtn" id="watchlistFilterBtn" onclick="setFilter('watchlist',this)" style="border-color:rgba(191,90,242,.4);color:var(--purple);">🔔 MY LIST <span id="watchlistCount" style="background:var(--purple);color:var(--bg);border-radius:10px;padding:1px 6px;font-size:9px;margin-left:3px;display:none;">0</span></button>
+   <div class="filter-sort-row">
+    <div class="filter-bar">
+     <span class="filter-lbl" style="flex-shrink:0;">FILTER:</span>
+     <button class="fbtn on" onclick="setFilter('all',this)">ALL</button>
+     <button class="fbtn" onclick="setFilter('trending',this)">🔍 TRENDING</button>
+     <button class="fbtn" onclick="setFilter('bullish',this)">🚀 MOONING</button>
+     <button class="fbtn" onclick="setFilter('bearish',this)">💀 DUMPING</button>
+     <button class="fbtn" onclick="setFilter('neutral',this)">👀 WATCH</button>
+     <button class="fbtn" id="watchlistFilterBtn" onclick="setFilter('watchlist',this)" style="border-color:rgba(191,90,242,.4);color:var(--purple);flex-shrink:0;">🔔 MY LIST <span id="watchlistCount" style="background:var(--purple);color:var(--bg);border-radius:10px;padding:1px 6px;font-size:9px;margin-left:3px;display:none;">0</span></button>
+    </div>
+    <div class="sort-wrap">
+     <span class="sort-lbl">SORT:</span>
+     <select class="sort-sel" id="sortSel" onchange="setSort(this.value)">
+      <option value="hype">Hype</option>
+      <option value="change_desc">▲ 24h</option>
+      <option value="change_asc">▼ 24h</option>
+      <option value="trending">Trending</option>
+     </select>
+    </div>
    </div>
 
    <div style="position:relative;margin-bottom:14px;">
@@ -648,7 +681,8 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
 </footer>
 
 <script>
-let coins=[], redditPosts=[], selected=null, filter='all';
+let coins=[], redditPosts=[], selected=null, filter='all', sortBy='hype';
+let scanning=false; // BUG FIX: guard against concurrent scans
 
 const watchlist={
   _key:'chr_watchlist_v1',
@@ -753,6 +787,8 @@ function showA2HSBanner(){
 
   document.getElementById('a2hsDismissBtn').onclick=()=>dismissA2HS(false);
   banner.classList.add('visible');
+  // BUG FIX: push page content up so the banner doesn't obscure bottom cards
+  document.body.style.paddingBottom='80px';
 }
 
 async function triggerInstall(){
@@ -767,6 +803,7 @@ async function triggerInstall(){
 function dismissA2HS(permanent=false){
   const banner=document.getElementById('a2hsBanner');
   if(banner)banner.classList.remove('visible');
+  document.body.style.paddingBottom='';
   if(permanent){
     localStorage.setItem(A2HS_KEY,JSON.stringify({dismissed:true,installedAt:Date.now()}));
   }
@@ -1135,6 +1172,9 @@ function tickClock(){
 }
 
 async function fullScan(){
+  // BUG FIX: prevent concurrent scans (double-fire from ?action=scan + load handler)
+  if(scanning)return;
+  scanning=true;
   showOverlay(true);
   document.getElementById('scanBtn').classList.add('busy');
   document.getElementById('scanBtn').textContent='⟳ SCANNING...';
@@ -1156,6 +1196,7 @@ async function fullScan(){
   showOverlay(false);
   document.getElementById('scanBtn').classList.remove('busy');
   document.getElementById('scanBtn').textContent='⟳ RESCAN';
+  scanning=false; // BUG FIX: release the guard
   renderCoins();updateStats();buildTags();setGauge();renderFeed(null);
   // Check for signal changes BEFORE saving — only fire if signal actually flipped
   await checkSignalChanges();
@@ -1195,7 +1236,7 @@ async function fetchMarketData(allIds,trendIds,gainerIds){
   if(!allIds.length){coins=getFallback();return;}
   try{
     const ids=allIds.slice(0,40).join(',');
-    const r=await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&per_page=40&page=1&sparkline=false&price_change_percentage=24h`);
+    const r=await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&per_page=40&page=1&sparkline=true&price_change_percentage=24h`);
     if(!r.ok)throw r.status;
     const data=await r.json();
     coins=data.map(coin=>{
@@ -1223,7 +1264,8 @@ async function fetchMarketData(allIds,trendIds,gainerIds){
         price:fmtP(coin.current_price),priceRaw:coin.current_price,
         ch24:ch,change:(ch>=0?'+':'')+ch.toFixed(2)+'%',changeDir:ch>=0?'up':'dn',
         hype:Math.max(5,Math.min(99,hype)),type,signal,badges,
-        mcap:fmtL(mcap),vol:fmtL(vol),rank:coin.market_cap_rank,isTrend,isGain
+        mcap:fmtL(mcap),vol:fmtL(vol),rank:coin.market_cap_rank,isTrend,isGain,
+        sparkline:(coin.sparkline_in_7d&&coin.sparkline_in_7d.price)||[]
       };
     });
     coins.sort((a,b)=>{
@@ -1276,6 +1318,7 @@ function renderCoins(){
     if(filter==='watchlist')vis=coins.filter(c=>watchlist.has(c.id));
     else if(filter!=='all')vis=coins.filter(c=>c.type===filter);
   }
+  vis=applySortToList(vis);
   if(filter==='watchlist'&&!q&&!vis.length){
     list.innerHTML=`<div class="empty" style="padding:40px 20px;">
       <div style="font-size:28px;margin-bottom:10px;">🔔</div>
@@ -1306,12 +1349,13 @@ function renderCoins(){
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
-          <button onclick="event.stopPropagation();openShareModal('${c.id}')" title="Share signal" class="share-card-btn">↗</button>
+          <button onclick="event.stopPropagation();openShareModal('${c.id}')" title="Share signal" class="share-card-btn"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="2.5" r="1.5"/><circle cx="10.5" cy="10.5" r="1.5"/><circle cx="2.5" cy="6.5" r="1.5"/><line x1="4" y1="6.5" x2="9" y2="3.2"/><line x1="4" y1="6.5" x2="9" y2="9.8"/></svg></button>
           <button onclick="event.stopPropagation();toggleWatch('${c.id}')" title="${isWatched?'Remove from watchlist':'Add to watchlist'}"
             style="background:${isWatched?'rgba(191,90,242,.2)':'transparent'};border:1px solid ${isWatched?'var(--purple)':'var(--border)'};color:${isWatched?'var(--purple)':'var(--dim)'};width:28px;height:28px;cursor:pointer;border-radius:4px;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;">
             🔔
           </button>
           <div class="price-block">
+            ${makeSparklineSVG(c.sparkline,c.changeDir==='up')}
             <div class="c-price">${c.price}</div>
             <div class="c-change ${c.changeDir}">${c.change}</div>
           </div>
@@ -1340,6 +1384,40 @@ function renderCoins(){
 }
 
 function bLbl(b){return{'trending-search':'🔍 SEARCH','volume-spike':'⚡ VOL SPIKE','gainer':'📈 GAINER','dumping':'📉 LOSER','reddit':'🤖 REDDIT'}[b]||b;}
+
+// ── Sparkline SVG generator ───────────────────────────────────────────────────
+function makeSparklineSVG(prices,isUp){
+  if(!prices||prices.length<4)return'';
+  // Downsample to ~40 points for clean rendering
+  const step=Math.max(1,Math.floor(prices.length/40));
+  const pts=prices.filter((_,i)=>i%step===0);
+  const W=72,H=22;
+  const min=Math.min(...pts),max=Math.max(...pts);
+  const range=max-min||1;
+  const coords=pts.map((p,i)=>{
+    const x=((i/(pts.length-1))*W).toFixed(1);
+    const y=(H-((p-min)/range)*(H-2)-1).toFixed(1);
+    return`${x},${y}`;
+  }).join(' ');
+  const col=isUp?'#00ff88':'#ff2d55';
+  const fillId='sf'+Math.random().toString(36).slice(2,6);
+  return`<svg class="sparkline" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="${fillId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${col}" stop-opacity=".25"/><stop offset="100%" stop-color="${col}" stop-opacity="0"/></linearGradient></defs><polyline points="${coords}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+// ── Sort ──────────────────────────────────────────────────────────────────────
+function setSort(val){
+  sortBy=val;
+  renderCoins();
+}
+
+function applySortToList(list){
+  const arr=[...list];
+  if(sortBy==='change_desc')return arr.sort((a,b)=>b.ch24-a.ch24);
+  if(sortBy==='change_asc')return arr.sort((a,b)=>a.ch24-b.ch24);
+  if(sortBy==='trending')return arr.sort((a,b)=>(b.isTrend-a.isTrend)||b.hype-a.hype);
+  // default: hype (original order already sorted by hype in fetchMarketData)
+  return arr.sort((a,b)=>b.hype-a.hype);
+}
 
 // Returns a deterministic exchange for a given coin ID (same coin → same exchange always)
 const EXCHANGES=[
