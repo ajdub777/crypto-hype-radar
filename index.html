@@ -301,6 +301,14 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
 .faq-a a{color:var(--blue);text-decoration:none;}
 .faq-a a:hover{text-shadow:var(--glow-blue);}
 
+/* ── Trade Now button (BUY signal only) ── */
+.trade-btn{display:flex;align-items:center;justify-content:space-between;width:100%;background:rgba(0,255,136,.07);border:1px solid rgba(0,255,136,.3);color:var(--green);font-family:'Orbitron',monospace;font-size:9px;font-weight:700;letter-spacing:2px;padding:9px 14px;cursor:pointer;transition:all .22s;margin-top:10px;text-decoration:none;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);}
+.trade-btn:hover{background:rgba(0,255,136,.16);border-color:var(--green);box-shadow:var(--glow-green);letter-spacing:2.5px;}
+.trade-btn-left{display:flex;align-items:center;gap:7px;}
+.trade-btn-exch{font-size:8px;color:rgba(0,255,136,.65);letter-spacing:1px;font-weight:400;}
+.trade-btn-arrow{font-size:11px;transition:transform .2s;}
+.trade-btn:hover .trade-btn-arrow{transform:translateX(3px);}
+
 /* ── Share signal button (on coin card) ── */
 .share-card-btn{background:transparent;border:1px solid var(--border);color:var(--dim);width:28px;height:28px;cursor:pointer;border-radius:4px;font-size:14px;font-family:'Orbitron',monospace;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;line-height:1;}
 .share-card-btn:hover{border-color:var(--blue);color:var(--blue);background:rgba(0,212,255,.08);}
@@ -1283,6 +1291,7 @@ function renderCoins(){
   list.innerHTML=vis.map((c,i)=>{
     const isWatched=watchlist.has(c.id);
     const isSelected=selected&&selected.id===c.id;
+    const exch=c.signal==='moon'?getExchangeForCoin(c.id):null;
     return`
     <div class="coin-card ${c.type}${isSelected?' selected':''}"
          onclick="selectCoin('${c.id}')"
@@ -1316,6 +1325,10 @@ function renderCoins(){
         <div class="badges">${c.badges.map(b=>`<span class="badge ${b}">${bLbl(b)}</span>`).join('')}</div>
         <span class="signal-pill ${c.signal}">${c.signal==='moon'?'🚀 MOON':c.signal==='dump'?'💀 DUMP':c.signal==='trend'?'🔍 TREND':'👀 WATCH'}</span>
       </div>
+      ${exch?`<a class="trade-btn" href="${exch.url}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">
+        <div class="trade-btn-left"><span>⚡ TRADE ${c.ticker}</span><span class="trade-btn-exch">ON ${exch.name.toUpperCase()}</span></div>
+        <span class="trade-btn-arrow">→</span>
+      </a>`:''}
       <div class="coin-detail">
         <div class="detail-cell"><div class="detail-lbl">Market Cap</div><div class="detail-val">${c.mcap}</div></div>
         <div class="detail-cell"><div class="detail-lbl">Volume 24h</div><div class="detail-val">${c.vol}</div></div>
@@ -1327,6 +1340,18 @@ function renderCoins(){
 }
 
 function bLbl(b){return{'trending-search':'🔍 SEARCH','volume-spike':'⚡ VOL SPIKE','gainer':'📈 GAINER','dumping':'📉 LOSER','reddit':'🤖 REDDIT'}[b]||b;}
+
+// Returns a deterministic exchange for a given coin ID (same coin → same exchange always)
+const EXCHANGES=[
+  {name:'Binance', url:'https://binance.com'},
+  {name:'Coinbase',url:'https://coinbase.com'},
+  {name:'Kraken',  url:'https://kraken.com'},
+];
+function getExchangeForCoin(coinId){
+  // Simple stable hash: sum of char codes mod number of exchanges
+  const hash=coinId.split('').reduce((acc,ch)=>acc+ch.charCodeAt(0),0);
+  return EXCHANGES[hash%EXCHANGES.length];
+}
 
 function selectCoin(id){
   selected=coins.find(c=>c.id===id)||null;
