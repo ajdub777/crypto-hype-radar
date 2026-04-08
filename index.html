@@ -455,7 +455,7 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
     </svg>
     <div class="logo-text">
       <h1>CRYPTO HYPE RADAR</h1>
-      <p>REAL-TIME SIGNALS · COINGECKO + REDDIT · BUY · SELL · HOLD</p>
+      <p>REAL-TIME SIGNALS · COINGECKO + REDDIT + BINANCE · BUY · SELL · HOLD</p>
     </div>
    </div>
    <div class="header-right">
@@ -1511,8 +1511,14 @@ function navCoin(dir){
 // ── Binance → CoinGecko enrichment fetch ─────────────────────────────────────
 async function fetchEnrichment(coin){
   const symbol=coin.ticker+'USDT';
+  // Try global Binance, then Binance US (for geo-restricted users), then CoinGecko
+  const binanceUrls=[
+    `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1d&limit=8`,
+    `https://api.binance.us/api/v3/klines?symbol=${symbol}&interval=1d&limit=8`,
+  ];
+  for(const url of binanceUrls){
   try{
-    const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1d&limit=8`);
+    const r=await fetch(url);
     if(!r.ok)throw new Error('no pair');
     const data=await r.json();
     const volumes=data.map(k=>parseFloat(k[5]));
@@ -1524,7 +1530,9 @@ async function fetchEnrichment(coin){
     const todayVol=volumes[volumes.length-1];
     const volRatio=avgVol>0?todayVol/avgVol:null;
     return{volumes,high7d,low7d,volRatio,source:'Binance'};
-  }catch(e){
+  }catch(e){continue;}
+  }
+  {
     try{
       const r=await fetch(`https://api.coingecko.com/api/v3/coins/${coin.id}/market_chart?vs_currency=usd&days=7&interval=daily`);
       if(!r.ok)throw new Error('cg fail');
