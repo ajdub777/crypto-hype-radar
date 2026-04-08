@@ -1435,6 +1435,28 @@ function makeLargeSparklineSVG(prices,isUp){
   </svg>`;
 }
 
+// ── Volume bar chart for analysis panel ──────────────────────────────────────
+function makeVolBarChart(volumes){
+  if(!volumes||volumes.length<2)return'';
+  const W=240,H=44,gap=3;
+  const n=volumes.length;
+  const barW=Math.floor((W-(n-1)*gap)/n);
+  const maxV=Math.max(...volumes)||1;
+  const avgV=volumes.slice(0,-1).reduce((a,b)=>a+b,0)/Math.max(volumes.length-1,1);
+  const avgY=H-Math.max(2,(avgV/maxV)*(H-4));
+  const bars=volumes.map((v,i)=>{
+    const bH=Math.max(2,(v/maxV)*(H-4));
+    const x=i*(barW+gap);
+    const y=H-bH;
+    const isLast=i===n-1;
+    const isSpike=v>avgV*2;
+    const col=isSpike?'#00ff88':isLast?'rgba(0,212,255,.7)':'rgba(0,212,255,.25)';
+    return`<rect x="${x}" y="${y.toFixed(1)}" width="${barW}" height="${bH.toFixed(1)}" fill="${col}" rx="1"/>`;
+  }).join('');
+  const avgLine=`<line x1="0" y1="${avgY.toFixed(1)}" x2="${W}" y2="${avgY.toFixed(1)}" stroke="rgba(255,214,10,.45)" stroke-width="1" stroke-dasharray="3,3"/>`;
+  return`<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;">${bars}${avgLine}</svg>`;
+}
+
 // ── Sort ──────────────────────────────────────────────────────────────────────
 function setSort(val){
   sortBy=val;
@@ -1486,11 +1508,48 @@ function navCoin(dir){
   },50);
 }
 
-function renderAnalysis(c){
+// ── Binance → CoinGecko enrichment fetch ─────────────────────────────────────
+async function fetchEnrichment(coin){
+  const symbol=coin.ticker+'USDT';
+  try{
+    const r=await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1d&limit=8`);
+    if(!r.ok)throw new Error('no pair');
+    const data=await r.json();
+    const volumes=data.map(k=>parseFloat(k[5]));
+    const highs=data.map(k=>parseFloat(k[2]));
+    const lows=data.map(k=>parseFloat(k[3]));
+    const high7d=Math.max(...highs);
+    const low7d=Math.min(...lows);
+    const avgVol=volumes.slice(0,-1).reduce((a,b)=>a+b,0)/Math.max(volumes.length-1,1);
+    const todayVol=volumes[volumes.length-1];
+    const volRatio=avgVol>0?todayVol/avgVol:null;
+    return{volumes,high7d,low7d,volRatio,source:'Binance'};
+  }catch(e){
+    try{
+      const r=await fetch(`https://api.coingecko.com/api/v3/coins/${coin.id}/market_chart?vs_currency=usd&days=7&interval=daily`);
+      if(!r.ok)throw new Error('cg fail');
+      const data=await r.json();
+      const volumes=(data.total_volumes||[]).map(v=>v[1]);
+      const prices=(data.prices||[]).map(p=>p[1]);
+      const high7d=prices.length?Math.max(...prices):null;
+      const low7d=prices.length?Math.min(...prices):null;
+      const avgVol=volumes.slice(0,-1).reduce((a,b)=>a+b,0)/Math.max(volumes.length-1,1);
+      const todayVol=volumes[volumes.length-1]||0;
+      const volRatio=avgVol>0?todayVol/avgVol:null;
+      return{volumes,high7d,low7d,volRatio,source:'CoinGecko'};
+    }catch(e2){
+      return{volumes:[],high7d:null,low7d:null,volRatio:null,source:null};
+    }
+  }
+}
+
+async function renderAnalysis(c){
   document.getElementById('analysisLabel').textContent=c.ticker+' · '+c.name;
   const box=document.getElementById('decisionBox');
   box.innerHTML=`<div class="thinking"><span>COMPUTING SIGNAL</span><span class="dots"><span>.</span><span>.</span><span>.</span></span></div>`;
-  setTimeout(()=>{
+  // Fetch enrichment (Binance → CoinGecko fallback) in parallel with loading animation
+  const [enrichment]=await Promise.all([fetchEnrichment(c),new Promise(r=>setTimeout(r,700))]);
+  {
     const ch=c.ch24,hype=c.hype,redditHit=c.badges.includes('reddit'),isTrend=c.isTrend;
     let score=0;
     if(ch>20)score+=3;else if(ch>8)score+=2;else if(ch>2)score+=1;
@@ -1556,17 +1615,47 @@ function renderAnalysis(c){
       </div>`;
     }
 
+    // ── Volume spike boosts score ───────────────────────────────────────────
+    if(enrichment.volRatio&&enrichment.volRatio>=3)score+=1;
+
+    // ── 7-day volume chart section ──────────────────────────────────────────
+    let volSection='';
+    if(enrichment.volumes&&enrichment.volumes.length>1){
+      const isSpike=enrichment.volRatio&&enrichment.volRatio>=2;
+      const spikeLabel=isSpike?`<span style="font-family:'Orbitron',monospace;font-size:8px;font-weight:700;color:var(--green);letter-spacing:1px;">⚡ ${enrichment.volRatio.toFixed(1)}x AVG</span>`:'';
+      volSection=`
+      <div class="price-chart-section">
+        <div class="price-chart-header">
+          <span class="price-chart-lbl">7-DAY VOLUME · <span style="color:var(--blue)">${enrichment.source}</span></span>
+          ${spikeLabel}
+        </div>
+        ${makeVolBarChart(enrichment.volumes)}
+        <div style="font-family:'Share Tech Mono',monospace;font-size:7px;color:var(--dim);margin-top:4px;display:flex;justify-content:space-between;">
+          <span>7 days ago</span><span style="color:${isSpike?'var(--green)':'var(--dim)'}">TODAY${isSpike?' 🔥':''}</span>
+        </div>
+      </div>`;
+    }
+
+    // ── TP/SL: use real 7D levels when available, else formula ─────────────
     const price=c.priceRaw;
-    let tpMult,slMult;
-    if(score>=4){tpMult=1.65;slMult=0.80;}
-    else if(score>=2){tpMult=1.40;slMult=0.82;}
-    else if(score<=-3){tpMult=1.08;slMult=0.88;}
-    else if(score<=-1){tpMult=1.12;slMult=0.90;}
-    else{tpMult=1.25;slMult=0.85;}
-    const tpPrice=price*tpMult;
-    const slPrice=price*slMult;
-    const tpPct='+'+Math.round((tpMult-1)*100)+'%';
-    const slPct=Math.round((slMult-1)*100)+'%';
+    let tpPrice,slPrice,tpPct,slPct,tpSource='',slSource='';
+    if(decClass==='buy'&&enrichment.high7d&&enrichment.high7d>price){
+      tpPrice=enrichment.high7d;
+      tpPct='+'+((tpPrice-price)/price*100).toFixed(0)+'%';
+      tpSource=`<div style="font-family:'Share Tech Mono',monospace;font-size:7px;color:var(--dim);margin-top:2px;">7D HIGH · ${enrichment.source}</div>`;
+    }else{
+      const m=score>=4?1.65:score>=2?1.40:score<=-3?1.08:score<=-1?1.12:1.25;
+      tpPrice=price*m;tpPct='+'+Math.round((m-1)*100)+'%';
+    }
+    if(enrichment.low7d&&enrichment.low7d<price){
+      slPrice=enrichment.low7d;
+      slPct=((slPrice-price)/price*100).toFixed(0)+'%';
+      slSource=`<div style="font-family:'Share Tech Mono',monospace;font-size:7px;color:var(--dim);margin-top:2px;">7D LOW · ${enrichment.source}</div>`;
+    }else{
+      const m=score>=4?0.80:score>=2?0.82:score<=-3?0.88:score<=-1?0.90:0.85;
+      slPrice=price*m;slPct=Math.round((m-1)*100)+'%';
+    }
+
     const riskFillColor=riskPct>70?'var(--red)':riskPct>45?'var(--yellow)':'var(--green)';
     box.innerHTML=`
       <div class="decision-block">
@@ -1579,16 +1668,19 @@ function renderAnalysis(c){
         <div class="dmeta-cell"><div class="dmeta-lbl">Mcap</div><div class="dmeta-val">${c.mcap}</div></div>
       </div>
       ${sparkSection}
+      ${volSection}
       <div class="tp-sl-grid">
         <div class="tp-cell tp">
           <div class="tp-lbl">🎯 Take Profit</div>
           <div class="tp-val">${fmtP(tpPrice)}</div>
           <div class="tp-pct">${tpPct} from current</div>
+          ${tpSource}
         </div>
         <div class="tp-cell sl">
           <div class="tp-lbl">🛑 Stop Loss</div>
           <div class="tp-val">${fmtP(slPrice)}</div>
           <div class="tp-pct">${slPct} from current</div>
+          ${slSource}
         </div>
       </div>
       <div class="risk-bar-wrap">
@@ -1599,7 +1691,7 @@ function renderAnalysis(c){
       <button class="watch-btn" onclick="openModal('${c.id}')">🔔 ALERT ME WHEN THIS MOVES</button>
       <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--dim);margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">⚠ NOT FINANCIAL ADVICE · DYOR · Crypto is high risk</div>`;
     setCoinGauge(c,score);
-  },700);
+  }
 }
 
 function setCoinGauge(c,score){
