@@ -1532,8 +1532,7 @@ async function fetchEnrichment(coin){
     return{volumes,high7d,low7d,volRatio,source:'Binance'};
   }catch(e){continue;}
   }
-  {
-    try{
+  try{
       const r=await fetch(`https://api.coingecko.com/api/v3/coins/${coin.id}/market_chart?vs_currency=usd&days=7&interval=daily`);
       if(!r.ok)throw new Error('cg fail');
       const data=await r.json();
@@ -1545,9 +1544,8 @@ async function fetchEnrichment(coin){
       const todayVol=volumes[volumes.length-1]||0;
       const volRatio=avgVol>0?todayVol/avgVol:null;
       return{volumes,high7d,low7d,volRatio,source:'CoinGecko'};
-    }catch(e2){
-      return{volumes:[],high7d:null,low7d:null,volRatio:null,source:null};
-    }
+  }catch(e2){
+    return{volumes:[],high7d:null,low7d:null,volRatio:null,source:null};
   }
 }
 
@@ -1557,8 +1555,7 @@ async function renderAnalysis(c){
   box.innerHTML=`<div class="thinking"><span>COMPUTING SIGNAL</span><span class="dots"><span>.</span><span>.</span><span>.</span></span></div>`;
   // Fetch enrichment (Binance → CoinGecko fallback) in parallel with loading animation
   const [enrichment]=await Promise.all([fetchEnrichment(c),new Promise(r=>setTimeout(r,700))]);
-  {
-    const ch=c.ch24,hype=c.hype,redditHit=c.badges.includes('reddit'),isTrend=c.isTrend;
+  const ch=c.ch24,hype=c.hype,redditHit=c.badges.includes('reddit'),isTrend=c.isTrend;
     let score=0;
     if(ch>20)score+=3;else if(ch>8)score+=2;else if(ch>2)score+=1;
     else if(ch<-15)score-=3;else if(ch<-5)score-=2;else if(ch<-1)score-=1;
@@ -1566,15 +1563,19 @@ async function renderAnalysis(c){
     if(isTrend)score+=1;
     if(redditHit)score+=1;
     if(ch<0&&hype>70)score-=1;
+    // Volume spike score boost — applied BEFORE signal decision so it affects the outcome
+    if(enrichment.volRatio&&enrichment.volRatio>=3)score+=1;
+    const volNote=enrichment.volRatio&&enrichment.volRatio>=2
+      ?` <span class='g'>Volume is ${enrichment.volRatio.toFixed(1)}x above average</span> — unusual activity detected.`:'';
     let decision,decClass,decIcon,confidence,riskLevel,riskColor,riskPct,context;
     if(score>=4){
       decision='BUY';decClass='buy';decIcon='🚀';confidence=Math.min(95,60+score*5);
       riskLevel='HIGH RISK';riskColor='var(--yellow)';riskPct=72;
-      context=`<span class='g hi'>Strong buy signal.</span> ${c.ticker} is showing <span class='hi'>${ch>=0?'+':''}${ch.toFixed(1)}%</span> price action with hype score <span class='g'>${hype}/100</span>${isTrend?' and trending on CoinGecko search':''}.${redditHit?' Reddit momentum is building.':''} <span class='y'>Consider a small initial position with a stop-loss at 20% below entry.</span>`;
+      context=`<span class='g hi'>Strong buy signal.</span> ${c.ticker} is showing <span class='hi'>${ch>=0?'+':''}${ch.toFixed(1)}%</span> price action with hype score <span class='g'>${hype}/100</span>${isTrend?' and trending on CoinGecko search':''}.${redditHit?' Reddit momentum is building.':''}${volNote} <span class='y'>Consider a small initial position with a stop-loss at 20% below entry.</span>`;
     }else if(score>=2){
       decision='BUY';decClass='buy';decIcon='📈';confidence=Math.min(75,45+score*6);
       riskLevel='MEDIUM-HIGH RISK';riskColor='var(--yellow)';riskPct=58;
-      context=`<span class='g'>Moderate buy signal.</span> ${c.ticker} has positive momentum — <span class='hi'>${ch>=0?'+':''}${ch.toFixed(1)}%</span> in 24h, hype <span class='y'>${hype}/100</span>.${redditHit?' Reddit activity adds confidence.':''} <span class='y'>Wait for volume confirmation or a small dip before entering. Use a tight stop-loss.</span>`;
+      context=`<span class='g'>Moderate buy signal.</span> ${c.ticker} has positive momentum — <span class='hi'>${ch>=0?'+':''}${ch.toFixed(1)}%</span> in 24h, hype <span class='y'>${hype}/100</span>.${redditHit?' Reddit activity adds confidence.':''}${volNote} <span class='y'>Wait for volume confirmation or a small dip before entering. Use a tight stop-loss.</span>`;
     }else if(score<=-3){
       decision='SELL';decClass='sell';decIcon='🔻';confidence=Math.min(92,60+Math.abs(score)*5);
       riskLevel='HOLDING = HIGH RISK';riskColor='var(--red)';riskPct=88;
@@ -1586,7 +1587,7 @@ async function renderAnalysis(c){
     }else{
       decision='HOLD';decClass='hold';decIcon='⏳';confidence=Math.min(65,40+hype/5);
       riskLevel='MODERATE RISK';riskColor='var(--yellow)';riskPct=45;
-      context=`<span class='y hi'>Hold / Watch signal.</span> ${c.ticker} consolidating — <span class='hi'>${ch>=0?'+':''}${ch.toFixed(1)}%</span> in 24h, hype <span class='y'>${hype}/100</span>.${isTrend?' Trending search suggests awareness is growing.':''} <span class='y'>Watch for a volume spike as the breakout trigger before entering.</span>`;
+      context=`<span class='y hi'>Hold / Watch signal.</span> ${c.ticker} consolidating — <span class='hi'>${ch>=0?'+':''}${ch.toFixed(1)}%</span> in 24h, hype <span class='y'>${hype}/100</span>.${isTrend?' Trending search suggests awareness is growing.':''}${volNote||' <span class=\'y\'>Watch for a volume spike as the breakout trigger before entering.</span>'}`;
     }
     // ── 7-day chart data ─────────────────────────────────────────────────────
     const sp=c.sparkline||[];
@@ -1594,7 +1595,7 @@ async function renderAnalysis(c){
     if(sp.length>10){
       const week7high=Math.max(...sp);
       const week7low=Math.min(...sp);
-      const week7pct=((sp[sp.length-1]-sp[0])/sp[0])*100;
+      const week7pct=((sp[sp.length-1]-sp[0])/(sp[0]||1))*100;
       const third=Math.floor(sp.length/3);
       const avgFirst=sp.slice(0,third).reduce((a,b)=>a+b,0)/third;
       const avgLast=sp.slice(-third).reduce((a,b)=>a+b,0)/third;
@@ -1605,7 +1606,7 @@ async function renderAnalysis(c){
       else if(trendPct>-5){trendLabel='→ FLAT';trendColor='var(--yellow)';}
       else if(trendPct>-15){trendLabel='↘ DECLINING';trendColor='#ff8c42';}
       else{trendLabel='↘ DUMPING';trendColor='var(--red)';}
-      const rangeStr=((week7high-week7low)/week7low*100).toFixed(0)+'%';
+      const rangeStr=((week7high-week7low)/(week7low||1)*100).toFixed(0)+'%';
       const pctColor=week7pct>=0?'var(--green)':'var(--red)';
       sparkSection=`
       <div class="price-chart-section">
@@ -1622,9 +1623,6 @@ async function renderAnalysis(c){
         </div>
       </div>`;
     }
-
-    // ── Volume spike boosts score ───────────────────────────────────────────
-    if(enrichment.volRatio&&enrichment.volRatio>=3)score+=1;
 
     // ── 7-day volume chart section ──────────────────────────────────────────
     let volSection='';
@@ -1698,8 +1696,7 @@ async function renderAnalysis(c){
       <div class="context-text">${context}</div>
       <button class="watch-btn" onclick="openModal('${c.id}')">🔔 ALERT ME WHEN THIS MOVES</button>
       <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--dim);margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">⚠ NOT FINANCIAL ADVICE · DYOR · Crypto is high risk</div>`;
-    setCoinGauge(c,score);
-  }
+  setCoinGauge(c,score);
 }
 
 function setCoinGauge(c,score){
