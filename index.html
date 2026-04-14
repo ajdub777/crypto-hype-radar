@@ -302,7 +302,7 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
 .signal-pill{font-size:8.5px;padding:4px 9px;}
 
 /* ── Features section ── */
-.features-section{padding:20px 0 4px;}
+.features-section{padding:12px 0 0;}
 .features-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px;}
 .feature-card{background:var(--surface);border:1px solid var(--border);padding:16px 14px;transition:all .2s;position:relative;overflow:hidden;}
 .feature-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent-color);opacity:.7;transition:opacity .2s;}
@@ -544,7 +544,7 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
  </div>
 </div>
 
-<div class="wrap" style="padding-top:20px;padding-bottom:40px;">
+<div class="wrap" style="padding-top:12px;padding-bottom:40px;">
  <div class="main-grid">
 
   <div style="order:1;">
@@ -706,7 +706,7 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
       <span>What does the Watchlist do?</span>
       <span class="faq-q-icon">+</span>
      </button>
-     <div class="faq-a">Click the 🔔 icon on any coin card to add it to your personal watchlist. Watchlist data is saved to your browser's local storage — no account or login required. Use the "MY LIST" filter to view only your watched coins. You can also subscribe to email alerts from the Signal Analysis panel.</div>
+     <div class="faq-a">Click the 🔔 icon on any coin card to add it to your personal watchlist. Watchlist data is saved to your browser's local storage — no account or login required. Use the "MY LIST" filter to view only your watched coins. Enable push alerts to get notified the moment a watchlist coin's signal flips.</div>
     </div>
 
    </div>
@@ -802,8 +802,8 @@ function maybeShowA2HS(){
   visits++;
   localStorage.setItem(VISIT_KEY,visits);
   if(visits<2)return;
-  // Show after a short delay so the page is loaded first
-  setTimeout(()=>showA2HSBanner(),2200);
+  // Show after 30s so user has time to explore the app first
+  setTimeout(()=>showA2HSBanner(),30000);
 }
 
 function showA2HSBanner(){
@@ -1314,9 +1314,12 @@ async function fullScan(){
   // Check for signal changes BEFORE saving — only fire if signal actually flipped
   await checkSignalChanges();
   if(coins.length&&!selected){
-    selected=coins[0];
+    // Auto-select the first BUY signal coin; fall back to first coin if none
+    const firstBuy=coins.find(c=>c.type==='bullish')||coins[0];
+    selected=firstBuy;
     renderCoins();
-    document.getElementById('navCounter').textContent=`1/${coins.length}`;
+    const idx=coins.indexOf(selected);
+    document.getElementById('navCounter').textContent=`${idx+1}/${coins.length}`;
     document.getElementById('analysisLabel').textContent=selected.ticker+' · '+selected.name;
     renderAnalysis(selected);
     renderFeed(selected);
