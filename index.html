@@ -250,7 +250,13 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-track{background:var(--bg);}
 ::-webkit-scrollbar-thumb{background:var(--border);}
-@media(max-width:900px){.main-grid{grid-template-columns:1fr;}.stats-bar{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:900px){
+  .main-grid{grid-template-columns:1fr;}
+  .stats-bar{grid-template-columns:repeat(3,1fr);}
+  /* On mobile: signal analysis panel appears first, coin list below */
+  .main-grid>[style*='order:2']{order:2;}
+  .right-panel{order:1;}
+}
 /* BUG FIX: keep stats at 3-col on small phones so 5th item never gets a half-width orphan row */
 /* BUG FIX: keep features at 2-col on small phones so it doesn't become a single endless column */
 @media(max-width:540px){
@@ -260,6 +266,16 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
   .feature-icon{font-size:20px;margin-bottom:8px;}
   .feature-title{font-size:9px;letter-spacing:1px;margin-bottom:5px;}
   .feature-desc{font-size:9.5px;line-height:1.55;}
+  /* Header: stack logo and buttons on small phones */
+  .header-inner{flex-direction:column;align-items:flex-start;gap:10px;}
+  .header-right{width:100%;display:flex;flex-wrap:wrap;gap:8px;}
+  .logo-text h1{font-size:16px;letter-spacing:2px;}
+  .logo-text p{font-size:8px;letter-spacing:2px;}
+  .scan-btn,.notif-btn{font-size:9px;padding:8px 12px;}
+  /* Right panel panels: reduce padding on mobile */
+  .panel-body{padding:10px;}
+  .decision-btn{font-size:18px;padding:12px;}
+  .dmeta-val{font-size:11px;}
 }
 
 /* ── Typography polish ── */
@@ -532,7 +548,7 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
 <div class="wrap" style="padding-top:20px;padding-bottom:40px;">
  <div class="main-grid">
 
-  <div>
+  <div style="order:2;">
    <div class="filter-sort-row">
     <div class="filter-bar">
      <span class="filter-lbl" style="flex-shrink:0;">FILTER:</span>
@@ -575,7 +591,7 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
    <div class="coins-list" id="coinsList"><div class="empty">INITIALIZING LIVE SIGNAL SCAN...</div></div>
   </div>
 
-  <div class="right-panel">
+  <div class="right-panel" style="order:1;">
    <div class="panel">
     <div class="panel-hdr">
      <span class="panel-title">⚡ SIGNAL ANALYSIS</span>
@@ -1042,6 +1058,9 @@ function drawShareCard(c){
   const W=canvas.width,H=canvas.height;
   const sigColor=SIG_COLORS[c.signal]||'#ffd60a';
   const sigLabel=(SIG_LABELS[c.signal]||c.signal).replace(/^\S+\s/,''); // strip emoji for big text
+  // Sanitize strings for canvas — remove non-BMP chars (emoji in names) that cause blank renders
+  const safeTicker=c.ticker.replace(/[^\x00-\xFFFF]/g,'').trim()||c.ticker;
+  const safeName=(c.name+(c.rank?' · Rank #'+c.rank:'')).replace(/[^\x00-\xFFFF]/g,'').trim();
 
   // ── Background ──
   ctx.fillStyle='#030712';
@@ -1090,12 +1109,12 @@ function drawShareCard(c){
   // ── Coin ticker ──
   ctx.font='bold 42px Orbitron, monospace';
   ctx.fillStyle='#e2e8f0';
-  ctx.fillText('$'+c.ticker,28,96);
+  ctx.fillText('$'+safeTicker,28,96);
 
   // ── Coin full name ──
   ctx.font='500 15px Rajdhani, sans-serif';
   ctx.fillStyle='#64748b';
-  ctx.fillText(c.name+(c.rank?' · Rank #'+c.rank:''),30,118);
+  ctx.fillText(safeName,30,118);
 
   // ── Signal box ──
   const boxX=28,boxY=136,boxW=220,boxH=66;
@@ -1882,6 +1901,10 @@ async function renderAnalysis(c){
         <div class="risk-bar"><div class="risk-fill" style="width:${riskPct}%;background:${riskFillColor};"></div></div>
       </div>
       <div class="context-text">${context}</div>
+      ${(decClass==='buy')?`<a class="trade-btn" href="${getExchangeForCoin(c.id).url}" target="_blank" rel="noopener noreferrer" style="margin-bottom:0;">
+        <div class="trade-btn-left"><span>⚡ TRADE ${c.ticker}</span><span class="trade-btn-exch">ON ${getExchangeForCoin(c.id).name.toUpperCase()}</span></div>
+        <span class="trade-btn-arrow">→</span>
+      </a>`:''}
       <button class="watch-btn" onclick="openModal('${c.id}')">🔔 ALERT ME WHEN THIS MOVES</button>
       <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--dim);margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">⚠ NOT FINANCIAL ADVICE · DYOR · Crypto is high risk</div>`;
   setCoinGauge(c,score);
