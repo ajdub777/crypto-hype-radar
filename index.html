@@ -852,6 +852,43 @@ if(new URLSearchParams(location.search).get('filter')==='watchlist'){
   });
 }
 
+// ── VAPID public key for server-side push subscription ───────────────────────
+const VAPID_PUBLIC_KEY='BGMWuoQmoAgRr4d7LHtmiYdsdxMUtDwFC-zETzhZB_10rMefvMAuJ4JT6jvXqXEevmIJdvvdHJlYETgtGMO01wI';
+
+function urlBase64ToUint8Array(base64String){
+  const padding='='.repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const rawData=window.atob(base64);
+  return Uint8Array.from([...rawData].map(c=>c.charCodeAt(0)));
+}
+
+async function registerServerPushSubscription(){
+  try{
+    if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
+    const reg=await navigator.serviceWorker.ready;
+    // Check if already subscribed
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub){
+      sub=await reg.pushManager.subscribe({
+        userVisibleOnly:true,
+        applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    // Register with Worker — stores subscription server-side
+    await fetch(MAKE_WEBHOOK+'/subscribe',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        subscription:sub.toJSON(),
+        coins:JSON.parse(localStorage.getItem('chr_watchlist_v2')||'[]')
+      })
+    });
+    console.log('[CHR] Server push subscription registered');
+  }catch(e){
+    console.warn('[CHR] Server push registration failed (non-critical):',e);
+  }
+}
+
 // ── Notification permission ──────────────────────────────────────────────────
 async function requestNotificationPermission(){
   if(!('Notification' in window)){
@@ -860,6 +897,8 @@ async function requestNotificationPermission(){
   }
   if(Notification.permission==='granted'){
     updateNotifBtn('granted');
+    // Re-register server subscription in case it lapsed
+    registerServerPushSubscription();
     return;
   }
   const result=await Notification.requestPermission();
@@ -867,6 +906,8 @@ async function requestNotificationPermission(){
   if(result==='granted'){
     // Save current signals as baseline so we don't spam on first run
     saveCurrentSignals();
+    // Register with server-side push system
+    registerServerPushSubscription();
   }
 }
 
@@ -1619,10 +1660,11 @@ function applySortToList(list){
 }
 
 // Returns a deterministic exchange for a given coin ID (same coin → same exchange always)
+// ── AFFILIATE LINKS — update these with your referral URLs ──────────────────
 const EXCHANGES=[
-  {name:'Binance', url:'https://binance.com'},
-  {name:'Coinbase',url:'https://coinbase.com'},
-  {name:'Kraken',  url:'https://kraken.com'},
+  {name:'Binance.US', url:'https://www.binance.us/register?ref=614588630'},
+  {name:'Coinbase',   url:'https://coinbase.com/join/68MU52K?src=referral-link'},
+  {name:'Kraken',     url:'https://invite.kraken.com/JDNW/oocwjn15'},
 ];
 function getExchangeForCoin(coinId){
   // Simple stable hash: sum of char codes mod number of exchanges
