@@ -68,7 +68,7 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
 .scan-btn:hover,.scan-btn.busy{background:var(--blue);color:var(--bg);box-shadow:var(--glow-blue);}
 .scan-btn.busy{animation:scanPulse .8s infinite;}
 @keyframes scanPulse{0%,100%{box-shadow:var(--glow-blue)}50%{box-shadow:0 0 40px rgba(0,212,255,.9)}}
-.stats-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-top:none;margin-bottom:22px;}
+.stats-bar{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-top:none;margin-bottom:22px;}
 .stat{background:var(--surface);padding:12px 16px;display:flex;flex-direction:column;gap:3px;}
 .stat-lbl{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;}
 .stat-val{font-family:'Orbitron',monospace;font-size:18px;font-weight:700;}
@@ -252,7 +252,7 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
 ::-webkit-scrollbar-thumb{background:var(--border);}
 @media(max-width:900px){
   .main-grid{grid-template-columns:1fr;}
-  .stats-bar{grid-template-columns:repeat(3,1fr);}
+  .stats-bar{grid-template-columns:repeat(3,1fr);/* 6 stats = 2 rows of 3 */}
   /* On mobile: signal analysis panel appears first, coin list below */
   .main-grid>[style*='order:2']{order:2;}
   .right-panel{order:1;}
@@ -507,6 +507,7 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
   <div class="stat"><div class="stat-lbl">🔍 Trending Search</div><div class="stat-val purple" id="sTrend">--</div></div>
   <div class="stat"><div class="stat-lbl">📈 Volume Spikes</div><div class="stat-val green" id="sVol">--</div></div>
   <div class="stat"><div class="stat-lbl">📉 Dumping Hard</div><div class="stat-val red" id="sDump">--</div></div>
+  <div class="stat"><div class="stat-lbl">😱 Fear &amp; Greed</div><div class="stat-val" id="sFG" style="font-size:13px;">--</div></div>
   <div class="stat"><div class="stat-lbl">⏱ Updated</div><div class="stat-val yellow" style="font-size:12px;" id="sTime">--</div></div>
  </div>
 </div>
@@ -955,10 +956,33 @@ function getPrevSignals(){
   catch(e){return{};}
 }
 
+function loadSignalTimes(){
+  // Restore signal timestamps from localStorage into coins array
+  try{
+    const times=JSON.parse(localStorage.getItem(SIGNALS_KEY+'_times')||'{}');
+    coins.forEach(c=>{if(times[c.id])c.signalAt=times[c.id];});
+  }catch(e){}
+}
+
 function saveCurrentSignals(){
   const map={};
-  coins.forEach(c=>{map[c.id]=c.signal;});
+  const prev=getPrevSignals();
+  const now=Math.floor(Date.now()/1000);
+  // Load existing timestamps
+  let times={};
+  try{times=JSON.parse(localStorage.getItem(SIGNALS_KEY+'_times')||'{}');}catch(e){}
+  coins.forEach(c=>{
+    map[c.id]=c.signal;
+    // Record timestamp when signal changes
+    if(!prev[c.id]||prev[c.id]!==c.signal){
+      times[c.id]=now;
+      c.signalAt=now;
+    } else if(times[c.id]){
+      c.signalAt=times[c.id];
+    }
+  });
   localStorage.setItem(SIGNALS_KEY,JSON.stringify(map));
+  localStorage.setItem(SIGNALS_KEY+'_times',JSON.stringify(times));
 }
 
 function getAlertTimes(){
@@ -1287,6 +1311,7 @@ async function fullScan(){
   document.getElementById('scanBtn').classList.remove('busy');
   document.getElementById('scanBtn').textContent='⟳ RESCAN';
   scanning=false; // BUG FIX: release the guard
+  loadSignalTimes();
   renderCoins();updateStats();buildTags();setGauge();renderFeed(null);
   // Check for signal changes BEFORE saving — only fire if signal actually flipped
   await checkSignalChanges();
@@ -1583,7 +1608,7 @@ function renderCoins(){
           <div class="hype-lbl"><span>HYPE</span><span>${c.hype}/100</span></div>
           <div class="hype-bar"><div class="hype-fill ${c.type==='bullish'?'g':c.type==='bearish'?'r':c.type==='trending'?'p':'y'}" style="width:${c.hype}%"></div></div>
         </div>
-        <div class="badges">${c.badges.map(b=>`<span class="badge ${b}">${bLbl(b)}</span>`).join('')}</div>
+        <div class="badges">${c.badges.map(b=>`<span class="badge ${b}">${bLbl(b)}</span>`).join('')}${c.signalAt?`<span class="badge" style="color:var(--dim);border-color:var(--border);font-size:8px;">⏱ ${timeAgo(c.signalAt)}</span>`:''}</div>
         <span class="signal-pill ${c.signal}">${c.signal==='moon'?'🚀 MOON':c.signal==='dump'?'💀 DUMP':c.signal==='trend'?'🔍 TREND':'👀 WATCH'}</span>
       </div>
       ${exch?`<a class="trade-btn" href="${exch.url}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">
@@ -1714,6 +1739,24 @@ function navCoin(dir){
     if(cards[next])cards[next].scrollIntoView({behavior:'smooth',block:'nearest'});
   },50);
 }
+
+// ── Swipe gestures for mobile coin navigation ───────────────────────────────
+(function(){
+  let tx=0,ty=0;
+  const el=document.getElementById('decisionBox')||document.body;
+  document.addEventListener('touchstart',e=>{
+    tx=e.changedTouches[0].screenX;
+    ty=e.changedTouches[0].screenY;
+  },{passive:true});
+  document.addEventListener('touchend',e=>{
+    const dx=e.changedTouches[0].screenX-tx;
+    const dy=e.changedTouches[0].screenY-ty;
+    // Only trigger if horizontal swipe is dominant and >50px
+    if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)*1.5){
+      navCoin(dx<0?1:-1);
+    }
+  },{passive:true});
+})();
 
 // ── Binance → CoinGecko enrichment fetch ─────────────────────────────────────
 async function fetchEnrichment(coin){
@@ -1969,6 +2012,23 @@ function updateStats(){
   animN('sTrend',coins.filter(c=>c.isTrend).length);
   animN('sVol',coins.filter(c=>c.badges.includes('volume-spike')||c.type==='bullish').length);
   animN('sDump',coins.filter(c=>c.type==='bearish').length);
+  fetchFearGreed();
+}
+
+async function fetchFearGreed(){
+  try{
+    const r=await fetch('https://api.alternative.me/fng/?limit=1');
+    const d=await r.json();
+    if(d&&d.data&&d.data[0]){
+      const val=parseInt(d.data[0].value);
+      const cls=d.data[0].value_classification;
+      const el=document.getElementById('sFG');
+      if(el){
+        el.textContent=val+' · '+cls.toUpperCase().replace(' ','\u00a0');
+        el.style.color=val>=75?'var(--red)':val>=55?'#ff8c42':val>=45?'var(--yellow)':val>=25?'#80ff72':'var(--green)';
+      }
+    }
+  }catch(e){/* silent fail */}
 }
 function animN(id,target){
   const el=document.getElementById(id);let cur=0;
