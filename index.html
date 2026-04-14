@@ -253,9 +253,7 @@ header{padding:20px 0;border-bottom:1px solid var(--border);}
 @media(max-width:900px){
   .main-grid{grid-template-columns:1fr;}
   .stats-bar{grid-template-columns:repeat(3,1fr);/* 6 stats = 2 rows of 3 */}
-  /* On mobile: coin list first, signal analysis below (natural order) */
-  .main-grid>[style*='order:2']{order:1;}
-  .right-panel{order:2;}
+  /* On mobile: coin list (order:1) shows first, signal analysis (order:2) below */
 }
 /* BUG FIX: keep stats at 3-col on small phones so 5th item never gets a half-width orphan row */
 /* BUG FIX: keep features at 2-col on small phones so it doesn't become a single endless column */
@@ -549,7 +547,7 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
 <div class="wrap" style="padding-top:20px;padding-bottom:40px;">
  <div class="main-grid">
 
-  <div style="order:2;">
+  <div style="order:1;">
    <div class="filter-sort-row">
     <div class="filter-bar">
      <span class="filter-lbl" style="flex-shrink:0;">FILTER:</span>
@@ -592,7 +590,7 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
    <div class="coins-list" id="coinsList"><div class="empty">INITIALIZING LIVE SIGNAL SCAN...</div></div>
   </div>
 
-  <div class="right-panel" style="order:1;">
+  <div class="right-panel" style="order:2;">
    <div class="panel">
     <div class="panel-hdr">
      <span class="panel-title">⚡ SIGNAL ANALYSIS</span>
