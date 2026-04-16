@@ -813,7 +813,14 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
    </div>
    <div class="sim-execute-panel" id="simExecutePanel">
     <div class="sim-execute-title">⚡ EXECUTE SIGNAL</div>
-    <div id="simNoCoin" style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--dim);">← Click a coin from the signal list to trade it</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+     <input id="simCoinSearch" type="text" placeholder="Search any coin (e.g. BTC, SOL, DOGE)..." autocomplete="off"
+      style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:11px;padding:8px 10px;outline:none;"
+      oninput="simSearchCoin(this.value)" onkeydown="if(event.key==='Escape'){this.value='';simSearchResults([]);}" />
+     <button onclick="simSearchCoin(document.getElementById('simCoinSearch').value)" style="background:var(--surface);border:1px solid var(--border);color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:10px;padding:8px 12px;cursor:pointer;">🔍</button>
+    </div>
+    <div id="simSearchDropdown" style="display:none;background:var(--surface);border:1px solid var(--border);margin-bottom:8px;max-height:180px;overflow-y:auto;"></div>
+    <div id="simNoCoin" style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--dim);">Search a coin above or click one from the signal list</div>
     <div id="simCoinReady" style="display:none;">
      <div class="sim-execute-row">
       <div class="sim-coin-info" id="simCoinInfo"></div>
@@ -2640,6 +2647,96 @@ function simToast(msg, type=''){
   el.textContent=msg;
   el.className='sim-toast show'+(type==='err'?' err':'');
   setTimeout(()=>el.classList.remove('show'),3000);
+}
+
+// ── Simulator coin search ───────────────────────────────────────────────────
+let simSearchTimer = null;
+function simSearchCoin(q){
+  q = (q||'').trim();
+  const dd = document.getElementById('simSearchDropdown');
+  // First check live scan coins
+  if(q.length < 1){ simSearchResults([]); return; }
+  const local = coins.filter(c=>
+    c.ticker.toLowerCase().includes(q.toLowerCase()) ||
+    c.name.toLowerCase().includes(q.toLowerCase())
+  );
+  if(local.length){ simSearchResults(local.slice(0,8)); return; }
+  // Debounce CoinGecko search
+  clearTimeout(simSearchTimer);
+  if(q.length < 2) return;
+  if(dd){ dd.style.display='block'; dd.innerHTML='<div style="padding:8px 12px;font-family:Share Tech Mono,monospace;font-size:10px;color:var(--dim);">Searching...</div>'; }
+  simSearchTimer = setTimeout(async ()=>{
+    try{
+      const r = await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(q)}`);
+      const d = await r.json();
+      const results = (d.coins||[]).slice(0,8).map(c=>({
+        id: c.id, ticker: c.symbol.toUpperCase(), name: c.name,
+        price: '...', priceRaw: 0, ch24: 0, change: '...', changeDir: 'up',
+        hype: 0, type: 'neutral', signal: 'watch', badges: [], mcap: '', vol: '',
+        rank: c.market_cap_rank, isTrend: false, isGain: false, image: c.large||c.thumb||null
+      }));
+      simSearchResults(results);
+    }catch(e){ simSearchResults([]); }
+  }, 400);
+}
+
+function simSearchResults(results){
+  const dd = document.getElementById('simSearchDropdown');
+  if(!dd) return;
+  if(!results.length){ dd.style.display='none'; dd.innerHTML=''; return; }
+  dd.style.display='block';
+  dd.innerHTML = results.map(c=>`
+    <div onclick="simPickSearchResult('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s;" onmouseover="this.style.background='rgba(255,255,255,.04)'" onmouseout="this.style.background='transparent'">
+      ${c.image?`<img src="${c.image}" style="width:20px;height:20px;border-radius:50%;" onerror="this.style.display='none'">`:'<div style="width:20px;height:20px;background:var(--border);border-radius:50%;"></div>'}
+      <span style="font-family:Share Tech Mono,monospace;font-size:11px;color:var(--green);">${c.ticker}</span>
+      <span style="font-family:Share Tech Mono,monospace;font-size:10px;color:var(--dim);">${c.name}</span>
+      ${c.rank?`<span style="margin-left:auto;font-family:Share Tech Mono,monospace;font-size:9px;color:var(--dim);">Rank #${c.rank}</span>`:''}
+    </div>`).join('');
+}
+
+async function simPickSearchResult(coinId){
+  const dd = document.getElementById('simSearchDropdown');
+  if(dd){ dd.style.display='none'; }
+  const si = document.getElementById('simCoinSearch');
+  // Check if already in live scan
+  const live = coins.find(c=>c.id===coinId);
+  if(live){ simSetCoin(live); if(si) si.value=live.ticker+' · '+live.name; return; }
+  // Fetch full data from CoinGecko
+  if(si) si.value='Loading...';
+  try{
+    const [mktRes, ohlcRes] = await Promise.all([
+      fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinId}&sparkline=true&price_change_percentage=24h`),
+      fetch(`https://api.binance.com/api/v3/klines?symbol=${coinId.toUpperCase()}USDT&interval=1d&limit=7`).catch(()=>null)
+    ]);
+    const mkt = mktRes.ok ? (await mktRes.json())[0] : null;
+    if(!mkt){ simToast('Could not load coin data','err'); if(si) si.value=''; return; }
+    const priceRaw = mkt.current_price||0;
+    const ch24 = mkt.price_change_percentage_24h||0;
+    const coin = {
+      id: mkt.id, ticker: mkt.symbol.toUpperCase(), name: mkt.name,
+      price: priceRaw < 0.001 ? '$'+priceRaw.toFixed(8) : priceRaw < 1 ? '$'+priceRaw.toFixed(4) : '$'+priceRaw.toFixed(2),
+      priceRaw, ch24,
+      change: (ch24>=0?'+':'')+ch24.toFixed(2)+'%',
+      changeDir: ch24>=0?'up':'dn',
+      hype: Math.min(99, Math.round(Math.abs(ch24)*2 + (mkt.market_cap_rank?Math.max(0,50-mkt.market_cap_rank/10):20))),
+      type: ch24>=10?'bullish':ch24<=-10?'bearish':'neutral',
+      signal: ch24>=10?'moon':ch24<=-10?'dump':'watch',
+      badges: [], mcap: mkt.market_cap?'$'+formatNum(mkt.market_cap):'',
+      vol: mkt.total_volume?'$'+formatNum(mkt.total_volume):'',
+      rank: mkt.market_cap_rank, isTrend: false, isGain: false,
+      image: mkt.image||null, isLookup: true
+    };
+    simSetCoin(coin);
+    if(si) si.value = coin.ticker+' · '+coin.name;
+  }catch(e){ simToast('Search failed','err'); if(si) si.value=''; }
+}
+
+function formatNum(n){
+  if(n>=1e12) return (n/1e12).toFixed(2)+'T';
+  if(n>=1e9)  return (n/1e9).toFixed(2)+'B';
+  if(n>=1e6)  return (n/1e6).toFixed(2)+'M';
+  if(n>=1e3)  return (n/1e3).toFixed(1)+'K';
+  return n.toFixed(2);
 }
 
 // Close simulator on backdrop click
