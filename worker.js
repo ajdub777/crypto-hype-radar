@@ -142,7 +142,8 @@ export default {
       return proxyCoingecko('https://api.coingecko.com/api/v3/search/trending', 'cg_trending', 300, env);
     }
     if (url.pathname === '/cg/gainers') {
-      return proxyCoingecko('https://api.coingecko.com/api/v3/coins/top_gainers_losers?vs_currency=usd&duration=24h&top_coins=300', 'cg_gainers', 300, env);
+      // top_gainers_losers is Pro-only — use free markets endpoint sorted by 24h change
+      return handleGainersFree(env);
     }
     if (url.pathname === '/cg/markets') {
       const ids = url.searchParams.get('ids') || '';
@@ -553,6 +554,35 @@ function base64urlDecode(str) {
   const padded = str.replace(/-/g, '+').replace(/_/g, '/');
   const padLen = (4 - padded.length % 4) % 4;
   return Uint8Array.from(atob(padded + '='.repeat(padLen)), c => c.charCodeAt(0));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// FREE-TIER GAINERS (replaces Pro-only top_gainers_losers endpoint)
+// ════════════════════════════════════════════════════════════════════════════
+async function handleGainersFree(env) {
+  const cacheKey = 'cg_gainers_free';
+  try {
+    const cached = await env.HYPE_CACHE.get(cacheKey);
+    if (cached) return new Response(cached, { headers: { 'Content-Type': 'application/json', ...CORS } });
+  } catch(e) {}
+
+  try {
+    // Fetch top 100 coins by market cap, sorted by 24h change
+    const res = await fetch(
+      'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h',
+      { headers: { 'Accept': 'application/json', 'User-Agent': 'CryptoHypeRadar/1.0' } }
+    );
+    if (!res.ok) return new Response(JSON.stringify({ top_gainers: [], top_losers: [] }), { headers: { 'Content-Type': 'application/json', ...CORS } });
+    const coins = await res.json();
+    const sorted = [...coins].sort((a, b) => (b.price_change_percentage_24h || 0) - (a.price_change_percentage_24h || 0));
+    const top_gainers = sorted.slice(0, 15).map(c => ({ id: c.id, symbol: c.symbol, name: c.name, usd: c.current_price, usd_24h_change: c.price_change_percentage_24h }));
+    const top_losers = sorted.slice(-10).reverse().map(c => ({ id: c.id, symbol: c.symbol, name: c.name, usd: c.current_price, usd_24h_change: c.price_change_percentage_24h }));
+    const body = JSON.stringify({ top_gainers, top_losers });
+    try { await env.HYPE_CACHE.put(cacheKey, body, { expirationTtl: 300 }); } catch(e) {}
+    return new Response(body, { headers: { 'Content-Type': 'application/json', ...CORS } });
+  } catch(e) {
+    return new Response(JSON.stringify({ top_gainers: [], top_losers: [] }), { headers: { 'Content-Type': 'application/json', ...CORS } });
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
