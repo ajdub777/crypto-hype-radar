@@ -1209,7 +1209,7 @@ const SIG_LABELS={moon:'🚀 BUY',dump:'💀 SELL',trend:'🔍 TRENDING',watch:'
 const SIG_BG={moon:'rgba(0,255,136,0.1)',dump:'rgba(255,45,85,0.1)',trend:'rgba(191,90,242,0.1)',watch:'rgba(255,214,10,0.1)'};
 
 async function openShareModal(coinId){
-  shareCoin=coins.find(c=>c.id===coinId)||null;
+  shareCoin=coins.find(c=>c.id===coinId)||(lookupCoin&&lookupCoin.id===coinId?lookupCoin:null)||null;
   if(!shareCoin)return;
   const sub=document.getElementById('shareModalSub');
   if(sub)sub.textContent=shareCoin.ticker+' · '+shareCoin.name;
@@ -2546,8 +2546,8 @@ async function simExecute(side){
 }
 
 async function simQuickSell(coinId, ticker, coinName, qty){
-  const coin = coins.find(c=>c.id===coinId);
-  if(!coin){ simToast('Coin not in current scan','err'); return; }
+  const coin = coins.find(c=>c.id===coinId)||(lookupCoin&&lookupCoin.id===coinId?lookupCoin:null)||null;
+  if(!coin){ simToast('Coin not in current scan — search it to sell','err'); return; }
   await simTrade(coin, 'SELL', qty);
 }
 
