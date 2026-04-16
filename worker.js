@@ -136,6 +136,43 @@ export default {
       return new Response('ok', { headers: CORS });
     }
 
+    // ── CoinGecko proxy routes (KV-cached, 5 min TTL) ──────────────────────
+
+    if (url.pathname === '/cg/trending') {
+      return proxyCoingecko('https://api.coingecko.com/api/v3/search/trending', 'cg_trending', 300, env);
+    }
+    if (url.pathname === '/cg/gainers') {
+      return proxyCoingecko('https://api.coingecko.com/api/v3/coins/top_gainers_losers?vs_currency=usd&duration=24h&top_coins=300', 'cg_gainers', 300, env);
+    }
+    if (url.pathname === '/cg/markets') {
+      const ids = url.searchParams.get('ids') || '';
+      const cacheKey = 'cg_markets_' + ids.split(',').sort().join(',').slice(0,80);
+      return proxyCoingecko(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&per_page=40&page=1&sparkline=true&price_change_percentage=24h`, cacheKey, 120, env);
+    }
+    if (url.pathname === '/cg/search') {
+      const q = url.searchParams.get('q') || '';
+      const cacheKey = 'cg_search_' + encodeURIComponent(q).slice(0,40);
+      return proxyCoingecko(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(q)}`, cacheKey, 300, env);
+    }
+    if (url.pathname === '/cg/coin') {
+      const id = url.searchParams.get('id') || '';
+      const cacheKey = 'cg_coin_' + id.slice(0,40);
+      return proxyCoingecko(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${id}&sparkline=true&price_change_percentage=24h`, cacheKey, 120, env);
+    }
+    if (url.pathname === '/cg/chart') {
+      const id = url.searchParams.get('id') || '';
+      const cacheKey = 'cg_chart_' + id.slice(0,40);
+      return proxyCoingecko(`https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=7&interval=daily`, cacheKey, 300, env);
+    }
+    if (url.pathname === '/cg/price') {
+      const ids = url.searchParams.get('ids') || '';
+      const cacheKey = 'cg_price_' + ids.split(',').sort().join(',').slice(0,80);
+      return proxyCoingecko(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`, cacheKey, 60, env);
+    }
+    if (url.pathname === '/cg/fng') {
+      return proxyCoingecko('https://api.alternative.me/fng/?limit=1', 'cg_fng', 300, env);
+    }
+
     return new Response('Crypto Hype Radar — Webhook Proxy', {
       headers: { 'Content-Type': 'text/plain' }
     });
@@ -516,4 +553,45 @@ function base64urlDecode(str) {
   const padded = str.replace(/-/g, '+').replace(/_/g, '/');
   const padLen = (4 - padded.length % 4) % 4;
   return Uint8Array.from(atob(padded + '='.repeat(padLen)), c => c.charCodeAt(0));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// COINGECKO PROXY HELPER (KV-cached)
+// ════════════════════════════════════════════════════════════════════════════
+async function proxyCoingecko(upstreamUrl, cacheKey, ttlSeconds, env) {
+  // Try KV cache first
+  try {
+    const cached = await env.HYPE_CACHE.get(cacheKey);
+    if (cached) {
+      return new Response(cached, {
+        headers: { 'Content-Type': 'application/json', ...CORS }
+      });
+    }
+  } catch(e) {}
+
+  // Fetch from CoinGecko server-side
+  try {
+    const res = await fetch(upstreamUrl, {
+      headers: { 'Accept': 'application/json', 'User-Agent': 'CryptoHypeRadar/1.0' }
+    });
+    if (!res.ok) {
+      return new Response(JSON.stringify({ error: 'upstream_error', status: res.status }), {
+        status: res.status,
+        headers: { 'Content-Type': 'application/json', ...CORS }
+      });
+    }
+    const body = await res.text();
+    // Cache the result
+    try {
+      await env.HYPE_CACHE.put(cacheKey, body, { expirationTtl: ttlSeconds });
+    } catch(e) {}
+    return new Response(body, {
+      headers: { 'Content-Type': 'application/json', ...CORS }
+    });
+  } catch(e) {
+    return new Response(JSON.stringify({ error: 'fetch_failed', message: e.message }), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json', ...CORS }
+    });
+  }
 }

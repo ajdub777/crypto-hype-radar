@@ -1521,7 +1521,7 @@ async function fullScan(){
 
 async function fetchTrending(){
   try{
-    const r=await fetch('https://api.coingecko.com/api/v3/search/trending');
+    const r=await fetch(MAKE_WEBHOOK+'/cg/trending');
     if(!r.ok)throw r.status;
     const d=await r.json();
     return(d.coins||[]).map(c=>c.item.id);
@@ -1530,7 +1530,7 @@ async function fetchTrending(){
 
 async function fetchGainers(){
   try{
-    const r=await fetch('https://api.coingecko.com/api/v3/coins/top_gainers_losers?vs_currency=usd&duration=24h&top_coins=300');
+    const r=await fetch(MAKE_WEBHOOK+'/cg/gainers');
     if(!r.ok)throw r.status;
     const d=await r.json();
     const g=(d.top_gainers||[]).slice(0,10).map(c=>c.id);
@@ -1543,7 +1543,7 @@ async function fetchMarketData(allIds,trendIds,gainerIds){
   if(!allIds.length){coins=getFallback();return;}
   try{
     const ids=allIds.slice(0,40).join(',');
-    const r=await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&per_page=40&page=1&sparkline=true&price_change_percentage=24h`);
+    const r=await fetch(MAKE_WEBHOOK+'/cg/markets?ids='+encodeURIComponent(ids));
     if(!r.ok)throw r.status;
     const data=await r.json();
     coins=data.map(coin=>{
@@ -1646,7 +1646,7 @@ function onSearchKey(e){
 
 async function fetchSearchResults(q){
   try{
-    const r=await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(q)}`);
+    const r=await fetch(MAKE_WEBHOOK+'/cg/search?q='+encodeURIComponent(q));
     if(!r.ok)throw new Error('search failed');
     const data=await r.json();
     const results=(data.coins||[]).slice(0,8);
@@ -1698,7 +1698,7 @@ async function pickSearchResult(coinId,coinName,ticker,thumb){
     </div>
   </div>`);
   try{
-    const r=await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinId}&sparkline=true&price_change_percentage=24h`);
+    const r=await fetch(MAKE_WEBHOOK+'/cg/coin?id='+encodeURIComponent(coinId));
     if(!r.ok)throw new Error('failed');
     const [coin]=await r.json();
     if(!coin)throw new Error('no data');
@@ -1977,7 +1977,7 @@ async function fetchEnrichment(coin){
   }catch(e){continue;}
   }
   try{
-      const r=await fetch(`https://api.coingecko.com/api/v3/coins/${coin.id}/market_chart?vs_currency=usd&days=7&interval=daily`);
+      const r=await fetch(MAKE_WEBHOOK+'/cg/chart?id='+encodeURIComponent(coin.id));
       if(!r.ok)throw new Error('cg fail');
       const data=await r.json();
       const volumes=(data.total_volumes||[]).map(v=>v[1]);
@@ -2211,7 +2211,7 @@ function updateStats(){
 
 async function fetchFearGreed(){
   try{
-    const r=await fetch('https://api.alternative.me/fng/?limit=1');
+    const r=await fetch(MAKE_WEBHOOK+'/cg/fng');
     const d=await r.json();
     if(d&&d.data&&d.data[0]){
       const val=parseInt(d.data[0].value);
@@ -2741,7 +2741,7 @@ async function simPollPrices(){
   const missing = openIds.filter(id=>!liveMap[id]);
   if(missing.length){
     try{
-      const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${missing.join(',')}&vs_currencies=usd`);
+      const r = await fetch(MAKE_WEBHOOK+'/cg/price?ids='+encodeURIComponent(missing.join(',')));
       const d = await r.json();
       missing.forEach(id=>{ if(d[id]) liveMap[id]=d[id].usd; });
     }catch(e){/* silent */}
@@ -2816,7 +2816,7 @@ function simSearchCoin(q){
   if(dd){ dd.style.display='block'; dd.innerHTML='<div style="padding:8px 12px;font-family:Share Tech Mono,monospace;font-size:10px;color:var(--dim);">Searching...</div>'; }
   simSearchTimer = setTimeout(async ()=>{
     try{
-      const r = await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(q)}`);
+      const r = await fetch(MAKE_WEBHOOK+'/cg/search?q='+encodeURIComponent(q));
       const d = await r.json();
       const results = (d.coins||[]).slice(0,8).map(c=>({
         id: c.id, ticker: c.symbol.toUpperCase(), name: c.name,
@@ -2854,7 +2854,7 @@ async function simPickSearchResult(coinId){
   if(si) si.value='Loading...';
   try{
     const [mktRes, ohlcRes] = await Promise.all([
-      fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinId}&sparkline=true&price_change_percentage=24h`),
+      fetch(MAKE_WEBHOOK+'/cg/coin?id='+encodeURIComponent(coinId)),
       fetch(`https://api.binance.com/api/v3/klines?symbol=${coinId.toUpperCase()}USDT&interval=1d&limit=7`).catch(()=>null)
     ]);
     const mkt = mktRes.ok ? (await mktRes.json())[0] : null;
