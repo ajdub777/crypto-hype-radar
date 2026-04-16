@@ -18,6 +18,13 @@
       "id": "f4b05cfaf57942a393f3b3569fdba034"
     }
   ],
+  "d1_databases": [
+    {
+      "binding": "HYPE_TRADER",
+      "database_name": "hype-trader",
+      "database_id": "4dca8dc8-0cd5-41cd-be02-4e092d76e46e"
+    }
+  ],
   "triggers": {
     "crons": ["*/5 * * * *"]
   }

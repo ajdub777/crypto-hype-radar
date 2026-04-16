@@ -301,6 +301,77 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
 .badge{font-size:8.5px;padding:2px 7px;}
 .signal-pill{font-size:8.5px;padding:4px 9px;}
 
+/* ── Hype Trader Simulator ── */
+.sim-btn{background:linear-gradient(135deg,rgba(0,255,136,.15),rgba(0,212,255,.1));border:1px solid var(--green);color:var(--green);font-family:'Orbitron',monospace;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:9px 16px;cursor:pointer;transition:all .2s;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);white-space:nowrap;}
+.sim-btn:hover{background:rgba(0,255,136,.25);box-shadow:0 0 16px rgba(0,255,136,.3);}
+.sim-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:2000;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 0;}
+.sim-modal-backdrop.on{display:flex;}
+.sim-modal{background:var(--surface);border:1px solid var(--border);width:100%;max-width:900px;margin:auto;position:relative;}
+.sim-modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);background:rgba(0,255,136,.04);}
+.sim-modal-title{font-family:'Orbitron',monospace;font-size:14px;font-weight:700;color:var(--green);letter-spacing:2px;}
+.sim-modal-close{background:transparent;border:1px solid var(--border);color:var(--dim);font-size:14px;padding:4px 10px;cursor:pointer;transition:all .15s;}
+.sim-modal-close:hover{border-color:var(--red);color:var(--red);}
+.sim-tabs{display:flex;border-bottom:1px solid var(--border);}
+.sim-tab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1.5px;padding:12px 20px;cursor:pointer;transition:all .15s;}
+.sim-tab.on{color:var(--green);border-bottom-color:var(--green);}
+.sim-tab:hover:not(.on){color:var(--text);}
+.sim-panel{display:none;padding:20px;}
+.sim-panel.on{display:block;}
+.sim-balance-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin-bottom:20px;}
+.sim-stat{background:var(--bg);padding:14px 16px;}
+.sim-stat-lbl{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;}
+.sim-stat-val{font-family:'Orbitron',monospace;font-size:18px;font-weight:700;}
+.sim-stat-val.green{color:var(--green);text-shadow:var(--glow-green);}
+.sim-stat-val.red{color:var(--red);text-shadow:var(--glow-red);}
+.sim-stat-val.blue{color:var(--blue);text-shadow:var(--glow-blue);}
+.sim-stat-val.yellow{color:var(--yellow);}
+.sim-execute-panel{background:rgba(0,255,136,.04);border:1px solid rgba(0,255,136,.2);padding:16px;margin-bottom:20px;}
+.sim-execute-title{font-family:'Orbitron',monospace;font-size:10px;color:var(--green);letter-spacing:2px;margin-bottom:12px;}
+.sim-execute-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.sim-coin-info{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text);flex:1;min-width:120px;}
+.sim-qty-input{background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:12px;padding:8px 12px;width:100px;outline:none;transition:border-color .15s;}
+.sim-qty-input:focus{border-color:var(--blue);}
+.sim-buy-btn{background:rgba(0,255,136,.15);border:1px solid var(--green);color:var(--green);font-family:'Orbitron',monospace;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:10px 18px;cursor:pointer;transition:all .2s;}
+.sim-buy-btn:hover{background:rgba(0,255,136,.3);box-shadow:var(--glow-green);}
+.sim-sell-btn{background:rgba(255,59,59,.12);border:1px solid var(--red);color:var(--red);font-family:'Orbitron',monospace;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:10px 18px;cursor:pointer;transition:all .2s;}
+.sim-sell-btn:hover{background:rgba(255,59,59,.25);box-shadow:var(--glow-red);}
+.sim-auto-row{display:flex;align-items:center;gap:10px;margin-top:10px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim);}
+.sim-toggle{position:relative;width:36px;height:20px;cursor:pointer;}
+.sim-toggle input{opacity:0;width:0;height:0;}
+.sim-toggle-slider{position:absolute;inset:0;background:var(--border);border-radius:20px;transition:.3s;}
+.sim-toggle-slider::before{content:'';position:absolute;width:14px;height:14px;left:3px;top:3px;background:var(--dim);border-radius:50%;transition:.3s;}
+.sim-toggle input:checked+.sim-toggle-slider{background:var(--green);}
+.sim-toggle input:checked+.sim-toggle-slider::before{transform:translateX(16px);background:var(--bg);}
+.sim-positions-table{width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;font-size:11px;}
+.sim-positions-table th{text-align:left;padding:8px 10px;color:var(--dim);letter-spacing:1px;font-size:9px;border-bottom:1px solid var(--border);}
+.sim-positions-table td{padding:10px 10px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text);}
+.sim-positions-table tr:hover td{background:rgba(0,212,255,.03);}
+.sim-pnl-pos{color:var(--green);}
+.sim-pnl-neg{color:var(--red);}
+.sim-empty{text-align:center;padding:40px;color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1px;}
+.sim-username-row{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.sim-username-input{background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:12px;padding:8px 12px;flex:1;max-width:200px;outline:none;}
+.sim-username-input:focus{border-color:var(--blue);}
+.sim-save-name-btn{background:transparent;border:1px solid var(--blue);color:var(--blue);font-family:'Share Tech Mono',monospace;font-size:10px;padding:8px 14px;cursor:pointer;transition:all .15s;}
+.sim-save-name-btn:hover{background:rgba(0,212,255,.1);}
+.sim-reset-btn{background:transparent;border:1px solid var(--red);color:var(--red);font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1px;padding:6px 12px;cursor:pointer;transition:all .15s;margin-left:auto;}
+.sim-reset-btn:hover{background:rgba(255,59,59,.1);}
+.sim-lb-row{display:grid;grid-template-columns:36px 1fr 100px 80px 80px;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);font-family:'Share Tech Mono',monospace;font-size:11px;}
+.sim-lb-row:hover{background:rgba(0,212,255,.03);}
+.sim-lb-rank{font-family:'Orbitron',monospace;font-size:12px;font-weight:700;color:var(--dim);}
+.sim-lb-rank.gold{color:#ffd60a;text-shadow:0 0 8px rgba(255,214,10,.5);}
+.sim-lb-rank.silver{color:#94a3b8;}
+.sim-lb-rank.bronze{color:#cd7f32;}
+.sim-lb-name{color:var(--text);font-size:12px;}
+.sim-lb-bal{color:var(--green);text-align:right;}
+.sim-lb-ret{text-align:right;font-weight:700;}
+.sim-lb-ret.pos{color:var(--green);}
+.sim-lb-ret.neg{color:var(--red);}
+.sim-lb-header{display:grid;grid-template-columns:36px 1fr 100px 80px 80px;gap:8px;padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:1.5px;border-bottom:1px solid var(--border);}
+.sim-toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface);border:1px solid var(--green);color:var(--green);font-family:'Share Tech Mono',monospace;font-size:11px;padding:10px 20px;z-index:3000;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;}
+.sim-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.sim-toast.err{border-color:var(--red);color:var(--red);}
+@media(max-width:600px){.sim-balance-bar{grid-template-columns:repeat(2,1fr);}.sim-lb-row,.sim-lb-header{grid-template-columns:28px 1fr 80px 60px;}.sim-lb-row>:last-child,.sim-lb-header>:last-child{display:none;}}
 /* ── Features section ── */
 .features-section{padding:12px 0 0;}
 .features-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px;}
@@ -494,6 +565,7 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
     <span class="clock" id="clock">--:--:-- UTC</span>
     <button class="notif-btn" id="notifBtn" onclick="requestNotificationPermission()" title="Enable push alerts for signal changes">🔔 ALERTS</button>
     <button class="scan-btn" id="scanBtn" onclick="fullScan()">⟳ RESCAN</button>
+    <button class="sim-btn" onclick="openSimulator()">🎮 PAPER TRADE</button>
    </div>
   </div>
  </div>
@@ -713,6 +785,89 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
   </div>
  </div>
 </div>
+
+<!-- HYPE TRADER SIMULATOR MODAL -->
+<div class="sim-modal-backdrop" id="simModal">
+ <div class="sim-modal">
+  <div class="sim-modal-header">
+   <div class="sim-modal-title">🎮 HYPE TRADER SIMULATOR</div>
+   <div style="display:flex;align-items:center;gap:10px;">
+    <span style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:1px;">PAPER TRADING · FAKE MONEY · REAL SIGNALS</span>
+    <button class="sim-modal-close" onclick="closeSimulator()">✕</button>
+   </div>
+  </div>
+  <div class="sim-tabs">
+   <button class="sim-tab on" onclick="simTab('trade',this)">⚡ TRADE</button>
+   <button class="sim-tab" onclick="simTab('portfolio',this)">📊 PORTFOLIO</button>
+   <button class="sim-tab" onclick="simTab('history',this)">📋 HISTORY</button>
+   <button class="sim-tab" onclick="simTab('leaderboard',this)">🏆 LEADERBOARD</button>
+  </div>
+
+  <!-- TRADE PANEL -->
+  <div class="sim-panel on" id="simTradePanel">
+   <div class="sim-balance-bar">
+    <div class="sim-stat"><div class="sim-stat-lbl">💰 Cash Balance</div><div class="sim-stat-val green" id="simBalance">$10,000</div></div>
+    <div class="sim-stat"><div class="sim-stat-lbl">📈 Total Return</div><div class="sim-stat-val" id="simReturn">+0.00%</div></div>
+    <div class="sim-stat"><div class="sim-stat-lbl">🏆 Win Rate</div><div class="sim-stat-val blue" id="simWinRate">--</div></div>
+    <div class="sim-stat"><div class="sim-stat-lbl">📊 Total Trades</div><div class="sim-stat-val yellow" id="simTradeCount">0</div></div>
+   </div>
+   <div class="sim-execute-panel" id="simExecutePanel">
+    <div class="sim-execute-title">⚡ EXECUTE SIGNAL</div>
+    <div id="simNoCoin" style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--dim);">← Click a coin from the signal list to trade it</div>
+    <div id="simCoinReady" style="display:none;">
+     <div class="sim-execute-row">
+      <div class="sim-coin-info" id="simCoinInfo"></div>
+      <input class="sim-qty-input" type="number" id="simQtyInput" placeholder="Qty" min="0.01" step="0.01" value="1"/>
+      <button class="sim-buy-btn" onclick="simExecute('BUY')">🚀 BUY</button>
+      <button class="sim-sell-btn" onclick="simExecute('SELL')">💀 SELL</button>
+     </div>
+     <div class="sim-auto-row">
+      <label class="sim-toggle"><input type="checkbox" id="simAutoExec"><span class="sim-toggle-slider"></span></label>
+      <span>AUTO-EXECUTE BUY signals for this coin</span>
+      <span id="simCostPreview" style="margin-left:auto;color:var(--dim);"></span>
+     </div>
+    </div>
+   </div>
+   <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:1px;margin-bottom:12px;">OPEN POSITIONS</div>
+   <div id="simOpenPositions"><div class="sim-empty">No open positions yet. Click a BUY signal coin above to start.</div></div>
+  </div>
+
+  <!-- PORTFOLIO PANEL -->
+  <div class="sim-panel" id="simPortfolioPanel">
+   <div class="sim-balance-bar">
+    <div class="sim-stat"><div class="sim-stat-lbl">💰 Cash Balance</div><div class="sim-stat-val green" id="simBalance2">$10,000</div></div>
+    <div class="sim-stat"><div class="sim-stat-lbl">📈 Total Return</div><div class="sim-stat-val" id="simReturn2">+0.00%</div></div>
+    <div class="sim-stat"><div class="sim-stat-lbl">💵 Total P&amp;L</div><div class="sim-stat-val" id="simTotalPnl">$0.00</div></div>
+    <div class="sim-stat"><div class="sim-stat-lbl">🏆 Win Rate</div><div class="sim-stat-val blue" id="simWinRate2">--</div></div>
+   </div>
+   <div class="sim-username-row">
+    <span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--dim);">DISPLAY NAME:</span>
+    <input class="sim-username-input" type="text" id="simUsernameInput" placeholder="Anon Trader" maxlength="24"/>
+    <button class="sim-save-name-btn" onclick="simSaveName()">SAVE</button>
+    <button class="sim-reset-btn" onclick="simReset()">↺ RESET $10K</button>
+   </div>
+   <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:1px;margin-bottom:12px;">ALL OPEN POSITIONS</div>
+   <div id="simPortfolioPositions"><div class="sim-empty">No open positions.</div></div>
+  </div>
+
+  <!-- HISTORY PANEL -->
+  <div class="sim-panel" id="simHistoryPanel">
+   <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:1px;margin-bottom:12px;">TRADE HISTORY (LAST 50)</div>
+   <div id="simHistoryList"><div class="sim-empty">No trades yet.</div></div>
+  </div>
+
+  <!-- LEADERBOARD PANEL -->
+  <div class="sim-panel" id="simLeaderboardPanel">
+   <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:1px;margin-bottom:12px;">TOP TRADERS BY RETURN · UPDATED LIVE</div>
+   <div class="sim-lb-header"><span>#</span><span>TRADER</span><span style="text-align:right;">BALANCE</span><span style="text-align:right;">RETURN</span><span style="text-align:right;">RANK</span></div>
+   <div id="simLeaderboardList"><div class="sim-empty">Loading leaderboard...</div></div>
+  </div>
+
+ </div>
+</div>
+
+<!-- SIM TOAST -->
+<div class="sim-toast" id="simToast"></div>
 
 <!-- SITE FOOTER -->
 <footer class="site-footer">
@@ -1311,6 +1466,8 @@ async function fullScan(){
   scanning=false; // BUG FIX: release the guard
   loadSignalTimes();
   renderCoins();updateStats();buildTags();setGauge();renderFeed(null);
+  // Auto-execute simulator trades for coins in the auto list
+  simCheckAutoExecute();
   // Check for signal changes BEFORE saving — only fire if signal actually flipped
   await checkSignalChanges();
   if(coins.length&&!selected){
@@ -1727,6 +1884,8 @@ function selectCoin(id){
     renderAnalysis(selected);
     renderFeed(selected);
     document.getElementById('decisionBox').scrollIntoView({behavior:'smooth',block:'nearest'});
+    // Wire selected coin into the Simulator trade panel
+    simSetCoin(selected);
   }
 }
 
@@ -2155,6 +2314,339 @@ function timeAgo(u){
   return Math.floor(d/86400)+'d ago';
 }
 function trunc(s,n){return s.length>n?s.slice(0,n)+'…':s;}
+
+// ════════════════════════════════════════════════════════════════════════════
+// HYPE TRADER SIMULATOR
+// ════════════════════════════════════════════════════════════════════════════
+const SIM_API = 'https://hype-radar.cryptohype-radar.workers.dev';
+const SIM_ID_KEY = 'chr_sim_id_v1';
+const SIM_AUTO_KEY = 'chr_sim_auto_v1';
+
+let simTrader = null;
+let simSelectedCoin = null;
+let simAutoCoins = new Set(JSON.parse(localStorage.getItem(SIM_AUTO_KEY)||'[]'));
+
+function simGetId(){
+  let id = localStorage.getItem(SIM_ID_KEY);
+  if(!id){
+    id = 'sim_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8);
+    localStorage.setItem(SIM_ID_KEY, id);
+  }
+  return id;
+}
+
+async function simInit(){
+  try{
+    const id = simGetId();
+    const res = await fetch(SIM_API+'/sim/init',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id, username: localStorage.getItem('chr_sim_name_v1')||''})
+    });
+    const data = await res.json();
+    if(data.trader){
+      simTrader = data.trader;
+      simRenderStats();
+    }
+  }catch(e){console.warn('[SIM] init failed',e);}
+}
+
+async function simLoadPortfolio(){
+  try{
+    const id = simGetId();
+    const res = await fetch(SIM_API+'/sim/portfolio?id='+encodeURIComponent(id));
+    const data = await res.json();
+    if(data.trader){
+      simTrader = data.trader;
+      simRenderStats();
+      simRenderPositions(data.positions, 'simOpenPositions');
+      simRenderPositions(data.positions, 'simPortfolioPositions');
+      simRenderHistory(data.trades);
+      const stats = data.stats||{};
+      document.getElementById('simWinRate').textContent = stats.win_rate!=null ? stats.win_rate+'%' : '--';
+      document.getElementById('simWinRate2').textContent = stats.win_rate!=null ? stats.win_rate+'%' : '--';
+      document.getElementById('simTradeCount').textContent = stats.total_trades||0;
+      const pnl = stats.total_pnl||0;
+      const pnlEl = document.getElementById('simTotalPnl');
+      pnlEl.textContent = (pnl>=0?'+':'')+fmtL(Math.abs(pnl));
+      pnlEl.className = 'sim-stat-val '+(pnl>=0?'green':'red');
+    }
+  }catch(e){console.warn('[SIM] portfolio load failed',e);}
+}
+
+function simRenderStats(){
+  if(!simTrader)return;
+  const bal = simTrader.balance||10000;
+  const ret = ((bal-10000)/10000)*100;
+  const retStr = (ret>=0?'+':'')+ret.toFixed(2)+'%';
+  ['simBalance','simBalance2'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.textContent='$'+bal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  });
+  ['simReturn','simReturn2'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    el.textContent=retStr;
+    el.className='sim-stat-val '+(ret>=0?'green':'red');
+  });
+}
+
+function simRenderPositions(positions, containerId){
+  const el = document.getElementById(containerId);
+  if(!el)return;
+  if(!positions||!positions.length){
+    el.innerHTML='<div class="sim-empty">No open positions.</div>';
+    return;
+  }
+  const rows = positions.map(p=>{
+    const currentCoin = coins.find(c=>c.id===p.coin_id);
+    const currentPrice = currentCoin ? currentCoin.priceRaw : null;
+    let unrealPnl = '';
+    if(currentPrice){
+      const pnl = (currentPrice - p.entry_price)*p.qty;
+      const pct = ((currentPrice-p.entry_price)/p.entry_price)*100;
+      unrealPnl = `<span class="${pnl>=0?'sim-pnl-pos':'sim-pnl-neg'}">${pnl>=0?'+':''}$${Math.abs(pnl).toFixed(2)} (${pct>=0?'+':''}${pct.toFixed(1)}%)</span>`;
+    } else {
+      unrealPnl = '<span style="color:var(--dim)">--</span>';
+    }
+    return `<tr>
+      <td><strong style="color:var(--blue)">${p.ticker}</strong></td>
+      <td>${p.qty.toFixed(4)}</td>
+      <td>${fmtP(p.entry_price)}</td>
+      <td>${currentPrice?fmtP(currentPrice):'--'}</td>
+      <td>${unrealPnl}</td>
+      <td><button class="sim-sell-btn" style="padding:4px 10px;font-size:9px;" onclick="simQuickSell('${p.coin_id}','${p.ticker}','${p.coin_name}',${p.qty})">SELL ALL</button></td>
+    </tr>`;
+  }).join('');
+  el.innerHTML=`<table class="sim-positions-table"><thead><tr><th>COIN</th><th>QTY</th><th>ENTRY</th><th>CURRENT</th><th>UNREALIZED P&L</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function simRenderHistory(trades){
+  const el = document.getElementById('simHistoryList');
+  if(!el)return;
+  if(!trades||!trades.length){
+    el.innerHTML='<div class="sim-empty">No trades yet.</div>';
+    return;
+  }
+  const rows = trades.map(t=>{
+    const pnlStr = t.pnl!=null ? `<span class="${t.pnl>=0?'sim-pnl-pos':'sim-pnl-neg'}">${t.pnl>=0?'+':''}$${Math.abs(t.pnl).toFixed(2)}</span>` : '--';
+    const d = new Date(t.ts);
+    const ts = d.toLocaleDateString()+' '+d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    return `<tr>
+      <td style="color:${t.side==='BUY'?'var(--green)':'var(--red)'}">${t.side}</td>
+      <td><strong style="color:var(--blue)">${t.ticker}</strong></td>
+      <td>${t.qty.toFixed(4)}</td>
+      <td>${fmtP(t.price)}</td>
+      <td>$${t.usd_value.toFixed(2)}</td>
+      <td>${pnlStr}</td>
+      <td style="color:var(--dim);font-size:9px;">${ts}</td>
+    </tr>`;
+  }).join('');
+  el.innerHTML=`<table class="sim-positions-table"><thead><tr><th>SIDE</th><th>COIN</th><th>QTY</th><th>PRICE</th><th>VALUE</th><th>P&L</th><th>TIME</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function simLoadLeaderboard(){
+  const el = document.getElementById('simLeaderboardList');
+  if(!el)return;
+  try{
+    const res = await fetch(SIM_API+'/sim/leaderboard');
+    const data = await res.json();
+    const lb = data.leaderboard||[];
+    if(!lb.length){
+      el.innerHTML='<div class="sim-empty">No traders yet — be the first!</div>';
+      return;
+    }
+    const myId = simGetId();
+    const rows = lb.map((t,i)=>{
+      const rank = i+1;
+      const rankClass = rank===1?'gold':rank===2?'silver':rank===3?'bronze':'';
+      const ret = t.return_pct||0;
+      const isMe = t.id===myId;
+      return `<div class="sim-lb-row" style="${isMe?'background:rgba(0,255,136,.06);border-left:2px solid var(--green);':''}">
+        <span class="sim-lb-rank ${rankClass}">${rank}</span>
+        <span class="sim-lb-name">${t.username||'Anon Trader'}${isMe?' <span style="color:var(--green);font-size:9px;">(YOU)</span>':''}</span>
+        <span class="sim-lb-bal">$${(t.balance||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+        <span class="sim-lb-ret ${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(2)}%</span>
+        <span style="text-align:right;color:var(--dim);font-size:9px;">${rank<=3?['🥇','🥈','🥉'][rank-1]:''}</span>
+      </div>`;
+    }).join('');
+    el.innerHTML=rows;
+  }catch(e){
+    el.innerHTML='<div class="sim-empty">Could not load leaderboard.</div>';
+  }
+}
+
+function openSimulator(){
+  document.getElementById('simModal').classList.add('on');
+  simInit().then(()=>simLoadPortfolio());
+  const nameInput = document.getElementById('simUsernameInput');
+  if(nameInput) nameInput.value = localStorage.getItem('chr_sim_name_v1')||'';
+}
+
+function closeSimulator(){
+  document.getElementById('simModal').classList.remove('on');
+}
+
+function simTab(name, btn){
+  document.querySelectorAll('.sim-tab').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.sim-panel').forEach(p=>p.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+  const panelMap = {trade:'simTradePanel',portfolio:'simPortfolioPanel',history:'simHistoryPanel',leaderboard:'simLeaderboardPanel'};
+  const panel = document.getElementById(panelMap[name]);
+  if(panel)panel.classList.add('on');
+  if(name==='portfolio'||name==='history') simLoadPortfolio();
+  if(name==='leaderboard') simLoadLeaderboard();
+}
+
+// Called when user clicks a coin card — sets the active coin for trading
+function simSetCoin(coin){
+  simSelectedCoin = coin;
+  const noCoin = document.getElementById('simNoCoin');
+  const coinReady = document.getElementById('simCoinReady');
+  const coinInfo = document.getElementById('simCoinInfo');
+  const costPreview = document.getElementById('simCostPreview');
+  if(!noCoin||!coinReady||!coinInfo)return;
+  noCoin.style.display='none';
+  coinReady.style.display='block';
+  const signalColor = coin.signal==='BUY'?'var(--green)':coin.signal==='SELL'?'var(--red)':'var(--yellow)';
+  coinInfo.innerHTML=`<strong style="color:var(--blue);font-size:13px;">${coin.ticker}</strong> · ${coin.name} · <strong style="color:${signalColor}">${coin.signal}</strong> · ${coin.price} · Hype ${coin.hype}/100`;
+  // Update cost preview
+  const qtyInput = document.getElementById('simQtyInput');
+  if(qtyInput){
+    const qty = parseFloat(qtyInput.value)||1;
+    const cost = qty * coin.priceRaw;
+    if(costPreview) costPreview.textContent = 'Cost: $'+cost.toFixed(2);
+  }
+  // Check auto-execute toggle
+  const autoExec = document.getElementById('simAutoExec');
+  if(autoExec) autoExec.checked = simAutoCoins.has(coin.id);
+  // Update auto-execute listener
+  if(autoExec){
+    autoExec.onchange = ()=>{
+      if(autoExec.checked){ simAutoCoins.add(coin.id); }
+      else { simAutoCoins.delete(coin.id); }
+      localStorage.setItem(SIM_AUTO_KEY, JSON.stringify([...simAutoCoins]));
+    };
+  }
+  // Update qty cost preview on input
+  if(qtyInput){
+    qtyInput.oninput = ()=>{
+      const q = parseFloat(qtyInput.value)||0;
+      const c = q * coin.priceRaw;
+      if(costPreview) costPreview.textContent = 'Cost: $'+c.toFixed(2);
+    };
+  }
+}
+
+async function simExecute(side){
+  if(!simSelectedCoin){ simToast('Select a coin first','err'); return; }
+  const qty = parseFloat(document.getElementById('simQtyInput').value)||1;
+  if(qty<=0){ simToast('Enter a valid quantity','err'); return; }
+  await simTrade(simSelectedCoin, side, qty);
+}
+
+async function simQuickSell(coinId, ticker, coinName, qty){
+  const coin = coins.find(c=>c.id===coinId);
+  if(!coin){ simToast('Coin not in current scan','err'); return; }
+  await simTrade(coin, 'SELL', qty);
+}
+
+async function simTrade(coin, side, qty){
+  const id = simGetId();
+  try{
+    const res = await fetch(SIM_API+'/sim/trade',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        trader_id: id,
+        side,
+        coin_id: coin.id,
+        ticker: coin.ticker,
+        coin_name: coin.name,
+        price: coin.priceRaw,
+        qty,
+        hype_score: coin.hype,
+        take_profit: coin.takeProfit||null,
+        stop_loss: coin.stopLoss||null
+      })
+    });
+    const data = await res.json();
+    if(data.error){
+      simToast(data.error,'err');
+      return;
+    }
+    if(data.ok){
+      const msg = side==='BUY'
+        ? `✅ Bought ${qty.toFixed(4)} ${coin.ticker} @ ${coin.price}`
+        : `💰 Sold ${coin.ticker} · P&L: ${data.pnl>=0?'+':''}$${Math.abs(data.pnl||0).toFixed(2)}`;
+      simToast(msg);
+      simTrader = {...(simTrader||{}), balance: data.balance};
+      simRenderStats();
+      await simLoadPortfolio();
+    }
+  }catch(e){
+    simToast('Trade failed — check connection','err');
+    console.warn('[SIM] trade error',e);
+  }
+}
+
+// Auto-execute: called after each scan completes for coins in auto list
+function simCheckAutoExecute(){
+  if(!simAutoCoins.size)return;
+  coins.forEach(coin=>{
+    if(simAutoCoins.has(coin.id) && coin.signal==='BUY'){
+      simTrade(coin,'BUY',1);
+    }
+  });
+}
+
+async function simSaveName(){
+  const input = document.getElementById('simUsernameInput');
+  if(!input)return;
+  const name = input.value.trim().slice(0,24);
+  if(!name){ simToast('Enter a display name','err'); return; }
+  localStorage.setItem('chr_sim_name_v1', name);
+  const id = simGetId();
+  try{
+    await fetch(SIM_API+'/sim/init',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id, username:name})
+    });
+    simToast('Name saved: '+name);
+  }catch(e){ simToast('Saved locally',''); }
+}
+
+async function simReset(){
+  if(!confirm('Reset your account to $10,000? This will delete all trades and positions.'))return;
+  const id = simGetId();
+  try{
+    const res = await fetch(SIM_API+'/sim/reset',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id})
+    });
+    const data = await res.json();
+    if(data.ok){
+      simToast('Account reset to $10,000');
+      await simLoadPortfolio();
+    }
+  }catch(e){ simToast('Reset failed','err'); }
+}
+
+function simToast(msg, type=''){
+  const el = document.getElementById('simToast');
+  if(!el)return;
+  el.textContent=msg;
+  el.className='sim-toast show'+(type==='err'?' err':'');
+  setTimeout(()=>el.classList.remove('show'),3000);
+}
+
+// Close simulator on backdrop click
+document.addEventListener('DOMContentLoaded',()=>{
+  const backdrop = document.getElementById('simModal');
+  if(backdrop) backdrop.addEventListener('click',e=>{ if(e.target===backdrop)closeSimulator(); });
+});
 
 function getFallback(){
   return[
