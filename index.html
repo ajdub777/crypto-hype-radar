@@ -2705,10 +2705,14 @@ async function simLoadWatchlistCoin(coinId){
 async function simSearchCoin(){
   const si = document.getElementById('simCoinSearch');
   const q = si?.value?.trim();
-  if(!q) return;
-  const local = coins.filter(c=>c.ticker.toLowerCase().includes(q.toLowerCase())||c.name.toLowerCase().includes(q.toLowerCase()));
-  if(local.length){ simSetCoin(local[0]); return; }
   const resultsEl = document.getElementById('simSearchResults');
+  if(!q){ if(resultsEl) resultsEl.innerHTML=''; return; }
+  // Show local matches as dropdown options — never auto-select
+  const local = coins.filter(c=>c.ticker.toLowerCase().includes(q.toLowerCase())||c.name.toLowerCase().includes(q.toLowerCase()));
+  if(local.length){
+    simSearchResults(local.slice(0,5).map(c=>({id:c.id,symbol:c.ticker,name:c.name,market_cap_rank:c.rank,thumb:''})));
+    return;
+  }
   if(resultsEl) resultsEl.innerHTML = '<div style="color:var(--dim);font-size:10px;padding:4px">Searching...</div>';
   try{
     const r = await fetch(SIM_API+'/cg/search?q='+encodeURIComponent(q));
