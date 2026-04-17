@@ -174,6 +174,11 @@ export default {
       return proxyCoingecko('https://api.alternative.me/fng/?limit=1', 'cg_fng', 300, env);
     }
 
+    // ── Reddit OAuth proxy ────────────────────────────────────────────────────
+    if (url.pathname === '/reddit/hot') {
+      return handleRedditHot(url, env);
+    }
+
     return new Response('Crypto Hype Radar — Webhook Proxy', {
       headers: { 'Content-Type': 'text/plain' }
     });
@@ -624,4 +629,122 @@ async function proxyCoingecko(upstreamUrl, cacheKey, ttlSeconds, env) {
       headers: { 'Content-Type': 'application/json', ...CORS }
     });
   }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// REDDIT OAUTH PROXY
+// GET /reddit/hot?sub=<subreddit>&limit=<n>
+// Uses Reddit OAuth app credentials stored as Worker secrets:
+//   REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET
+// Falls back to public JSON API if secrets not configured.
+// ════════════════════════════════════════════════════════════════════════════
+
+async function handleRedditHot(url, env) {
+  const sub = (url.searchParams.get('sub') || 'CryptoCurrency').replace(/[^a-zA-Z0-9_]/g, '');
+  const limit = Math.min(parseInt(url.searchParams.get('limit') || '25'), 50);
+  const cacheKey = `reddit_hot_${sub}_${limit}`;
+
+  // Check cache first (5 min TTL)
+  try {
+    const cached = await env.HYPE_CACHE.get(cacheKey);
+    if (cached) {
+      return new Response(cached, { headers: { 'Content-Type': 'application/json', ...CORS } });
+    }
+  } catch(e) {}
+
+  // Try authenticated OAuth if credentials are available
+  if (env.REDDIT_CLIENT_ID && env.REDDIT_CLIENT_SECRET) {
+    try {
+      const posts = await fetchRedditOAuth(sub, limit, env);
+      const body = JSON.stringify(posts);
+      try { await env.HYPE_CACHE.put(cacheKey, body, { expirationTtl: 300 }); } catch(e) {}
+      return new Response(body, { headers: { 'Content-Type': 'application/json', ...CORS } });
+    } catch(e) {
+      console.warn('[Reddit OAuth] failed, falling back to public API:', e.message);
+    }
+  }
+
+  // Fallback: public JSON API (no auth)
+  try {
+    const r = await fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=${limit}`, {
+      headers: { 'Accept': 'application/json', 'User-Agent': 'CryptoHypeRadar/1.0' }
+    });
+    if (!r.ok) throw new Error('Reddit public API returned ' + r.status);
+    const d = await r.json();
+    const posts = (d.data?.children || [])
+      .map(p => p.data)
+      .filter(p => !p.stickied)
+      .map(p => ({
+        subreddit: p.subreddit,
+        title: p.title,
+        author: p.author,
+        score: p.score,
+        num_comments: p.num_comments,
+        permalink: p.permalink,
+        created_utc: p.created_utc,
+        selftext: (p.selftext || '').slice(0, 200),
+        upvote_ratio: p.upvote_ratio || 0
+      }));
+    const body = JSON.stringify(posts);
+    try { await env.HYPE_CACHE.put(cacheKey, body, { expirationTtl: 300 }); } catch(e) {}
+    return new Response(body, { headers: { 'Content-Type': 'application/json', ...CORS } });
+  } catch(e) {
+    return new Response(JSON.stringify({ error: 'reddit_unavailable', posts: [] }), {
+      status: 502, headers: { 'Content-Type': 'application/json', ...CORS }
+    });
+  }
+}
+
+async function fetchRedditOAuth(sub, limit, env) {
+  // Get OAuth token (cached for ~1 hour)
+  const tokenKey = 'reddit_oauth_token';
+  let token = null;
+
+  try {
+    const cached = await env.HYPE_CACHE.get(tokenKey);
+    if (cached) token = cached;
+  } catch(e) {}
+
+  if (!token) {
+    const creds = btoa(`${env.REDDIT_CLIENT_ID}:${env.REDDIT_CLIENT_SECRET}`);
+    const tokenRes = await fetch('https://www.reddit.com/api/v1/access_token', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${creds}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'CryptoHypeRadar/1.0 by UniqueQuiet9204'
+      },
+      body: 'grant_type=client_credentials'
+    });
+    if (!tokenRes.ok) throw new Error('Token fetch failed: ' + tokenRes.status);
+    const tokenData = await tokenRes.json();
+    token = tokenData.access_token;
+    if (!token) throw new Error('No access token in response');
+    // Cache for 50 minutes (token lasts 60)
+    try { await env.HYPE_CACHE.put(tokenKey, token, { expirationTtl: 3000 }); } catch(e) {}
+  }
+
+  const r = await fetch(`https://oauth.reddit.com/r/${sub}/hot?limit=${limit}&raw_json=1`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'User-Agent': 'CryptoHypeRadar/1.0 by UniqueQuiet9204',
+      'Accept': 'application/json'
+    }
+  });
+  if (!r.ok) throw new Error('Reddit OAuth API returned ' + r.status);
+  const d = await r.json();
+  return (d.data?.children || [])
+    .map(p => p.data)
+    .filter(p => !p.stickied)
+    .map(p => ({
+      subreddit: p.subreddit,
+      title: p.title,
+      author: p.author,
+      score: p.score,
+      num_comments: p.num_comments,
+      permalink: p.permalink,
+      created_utc: p.created_utc,
+      selftext: (p.selftext || '').slice(0, 200),
+      upvote_ratio: p.upvote_ratio || 0
+    }));
 }

@@ -1119,7 +1119,7 @@ const SIG_LABELS={moon:'🚀 BUY',dump:'💀 SELL',trend:'🔍 TRENDING',watch:'
 const SIG_BG={moon:'rgba(0,255,136,0.1)',dump:'rgba(255,45,85,0.1)',trend:'rgba(191,90,242,0.1)',watch:'rgba(255,214,10,0.1)'};
 
 async function openShareModal(coinId){
-  shareCoin=coins.find(c=>c.id===coinId)||null;
+  shareCoin=coins.find(c=>c.id===coinId)||(typeof lookupCoin!=='undefined'&&lookupCoin&&lookupCoin.id===coinId?lookupCoin:null)||null;
   if(!shareCoin)return;
   const sub=document.getElementById('shareModalSub');
   if(sub)sub.textContent=shareCoin.ticker+' · '+shareCoin.name;
@@ -1368,6 +1368,7 @@ async function fullScan(){
   await fetchMarketData(allIds,trendIds,gainerIds);
   await fetchReddit();
   crossBoost();
+  await fetchFundingRates().catch(()=>{});
   setOverlay('SCAN COMPLETE ✓',`${coins.length} live signals · ${redditPosts.length} reddit posts`);
   await sleep(550);
   showOverlay(false);
@@ -1463,12 +1464,56 @@ async function fetchMarketData(allIds,trendIds,gainerIds){
   }
 }
 
+// ── Binance Funding Rates ─────────────────────────────────────────────────────
+const BINANCE_FUTURES_MAP = {
+  'bitcoin':'BTCUSDT','ethereum':'ETHUSDT','solana':'SOLUSDT','dogecoin':'DOGEUSDT',
+  'shiba-inu':'SHIBUSDT','pepe':'PEPEUSDT','dogwifcoin':'WIFUSDT','bonk':'BONKUSDT',
+  'floki':'FLOKIUSDT','avalanche-2':'AVAXUSDT','chainlink':'LINKUSDT','polkadot':'DOTUSDT',
+  'cardano':'ADAUSDT','ripple':'XRPUSDT','tron':'TRXUSDT','near':'NEARUSDT',
+  'injective-protocol':'INJUSDT','sui':'SUIUSDT','aptos':'APTUSDT','arbitrum':'ARBUSDT',
+  'optimism':'OPUSDT','aave':'AAVEUSDT','uniswap':'UNIUSDT','render-token':'RENDERUSDT',
+  'tao':'TAOUSDT','ordi':'ORDIUSDT','drift-protocol':'DRIFTUSDT'
+};
+
+async function fetchFundingRates(){
+  const symbols = coins.map(c=>BINANCE_FUTURES_MAP[c.id]).filter(Boolean);
+  if(!symbols.length) return;
+  try{
+    const results = await Promise.allSettled(
+      symbols.map(sym=>fetch('https://fapi.binance.com/fapi/v1/fundingRate?limit=1&symbol='+sym).then(r=>r.json()))
+    );
+    results.forEach((res,i)=>{
+      if(res.status!=='fulfilled') return;
+      const data = res.value;
+      const entry = Array.isArray(data)?data[0]:data;
+      if(!entry||entry.code) return;
+      const sym = symbols[i];
+      const rate = parseFloat(entry.fundingRate||0)*100;
+      const coinId = Object.keys(BINANCE_FUTURES_MAP).find(k=>BINANCE_FUTURES_MAP[k]===sym);
+      const coin = coins.find(c=>c.id===coinId);
+      if(!coin) return;
+      coin.fundingRate = rate;
+      if(rate > 0.05 && !coin.badges.includes('overleveraged')){
+        coin.badges.push('overleveraged');
+        if(coin.type==='bullish'){ coin.hype=Math.max(coin.hype-8,5); }
+      }
+      if(rate < -0.02 && !coin.badges.includes('squeeze')){
+        coin.badges.push('squeeze');
+        if(coin.type!=='bearish'){ coin.hype=Math.min(coin.hype+8,99); }
+      }
+    });
+  }catch(e){ console.warn('[CHR] Funding rates fetch failed',e); }
+}
+
 async function fetchReddit(){
   redditPosts=[];
   const subs=[SUBS[0],SUBS[1+Math.floor(Math.random()*(SUBS.length-1))]];
   const results=await Promise.allSettled(
-    subs.map(s=>fetch(`https://www.reddit.com/r/${s}/hot.json?limit=20`,{headers:{Accept:'application/json'}})
-      .then(r=>r.json()).then(d=>d.data.children.map(p=>p.data).filter(p=>!p.stickied)))
+    subs.map(s=>fetch(`https://hype-radar.cryptohype-radar.workers.dev/reddit/hot?sub=${s}&limit=25`,{headers:{Accept:'application/json'}})
+      .then(r=>r.ok?r.json():Promise.reject(r.status))
+      .catch(()=>fetch(`https://www.reddit.com/r/${s}/hot.json?limit=20`,{headers:{Accept:'application/json'}})
+        .then(r=>r.json()).then(d=>d.data.children.map(p=>p.data).filter(p=>!p.stickied)))
+    )
   );
   results.forEach(r=>{if(r.status==='fulfilled')redditPosts.push(...r.value);});
   redditPosts=redditPosts.slice(0,30).map(p=>({
@@ -1692,7 +1737,7 @@ function renderCoins(){
   }).join('');
 }
 
-function bLbl(b){return{'trending-search':'📡 TRENDING','volume-spike':'⚡ VOL SPIKE','gainer':'📈 GAINER','dumping':'📉 LOSER','reddit':'🤖 REDDIT','lookup':'🔍 LOOKUP'}[b]||b;}
+function bLbl(b){return{'trending-search':'📡 TRENDING','volume-spike':'⚡ VOL SPIKE','gainer':'📈 GAINER','dumping':'📉 LOSER','reddit':'🤖 REDDIT','lookup':'🔍 LOOKUP','overleveraged':'⚠️ OVERLEV','squeeze':'🔄 SQUEEZE'}[b]||b;}
 
 // ── Sparkline SVG generator ───────────────────────────────────────────────────
 function makeSparklineSVG(prices,isUp){
@@ -2237,7 +2282,9 @@ function getFallback(){
 // ── HYPE TRADER SIMULATOR ──────────────────────────────────────────────────
 
 // ═══════════════════════════════════════════════════════════════
-// HYPE TRADER SIMULATOR — Paper Trading Engine
+// HYPE TRADER SIMULATOR v2 — Paper Trading Engine
+// Fixes: correct API field names (side/qty), clean UI, share bug,
+//        watchlist chips, searched coin trading
 // ═══════════════════════════════════════════════════════════════
 const SIM_API = 'https://hype-radar.cryptohype-radar.workers.dev';
 const SIM_UUID_KEY = 'chr_sim_uuid_v1';
@@ -2256,16 +2303,17 @@ async function simInit(){
   try{
     const r = await fetch(SIM_API+'/sim/init', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({trader_id: simGetUUID()})
+      body: JSON.stringify({ id: simGetUUID() })
     });
     if(!r.ok) throw r.status;
-    simTrader = await r.json();
+    const data = await r.json();
+    simTrader = data.trader || data;
   }catch(e){ console.warn('[SIM] init failed', e); }
 }
 
 async function simLoadPortfolio(){
   try{
-    const r = await fetch(SIM_API+'/sim/portfolio?trader_id='+simGetUUID());
+    const r = await fetch(SIM_API+'/sim/portfolio?id='+simGetUUID());
     if(!r.ok) throw r.status;
     const data = await r.json();
     simTrader = data;
@@ -2275,15 +2323,20 @@ async function simLoadPortfolio(){
 }
 
 function simRenderPortfolio(data){
-  const bal = data.balance||10000;
-  const ret = data.total_return_pct||0;
-  const win = data.win_rate||0;
-  const total = data.total_trades||0;
+  const trader = data.trader || data;
+  const stats = data.stats || {};
+  const bal = trader.balance != null ? trader.balance : (data.balance||10000);
+  const ret = stats.total_return_pct != null ? stats.total_return_pct : (data.total_return_pct||0);
+  const win = stats.win_rate != null ? stats.win_rate : (data.win_rate||0);
+  const total = stats.total_trades != null ? stats.total_trades : (data.total_trades||0);
   const el = id => document.getElementById(id);
-  if(el('simBalance')) el('simBalance').textContent = '$'+bal.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-  if(el('simReturn')){ el('simReturn').textContent = (ret>=0?'+':'')+ret.toFixed(2)+'%'; el('simReturn').style.color = ret>=0?'var(--green)':'var(--red)'; }
-  if(el('simWinRate')) el('simWinRate').textContent = win.toFixed(0)+'%';
-  if(el('simTotalTrades')) el('simTotalTrades').textContent = total;
+  const fmtBal = '$'+parseFloat(bal).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmtRet = (ret>=0?'+':'')+parseFloat(ret).toFixed(2)+'%';
+  const fmtWin = parseFloat(win).toFixed(0)+'%';
+  ['simBalance','simBalance2'].forEach(id=>{ if(el(id)) el(id).textContent=fmtBal; });
+  ['simReturn','simReturn2'].forEach(id=>{ if(el(id)){ el(id).textContent=fmtRet; el(id).style.color=ret>=0?'var(--green)':'var(--red)'; } });
+  ['simWinRate','simWinRate2'].forEach(id=>{ if(el(id)) el(id).textContent=fmtWin; });
+  ['simTotalTrades','simTotalTrades2'].forEach(id=>{ if(el(id)) el(id).textContent=total; });
   simRenderPositions(data.positions||[]);
 }
 
@@ -2294,13 +2347,12 @@ function simRenderPositions(positions){
   el.innerHTML = positions.map(p=>`
     <div class="sim-pos-row" id="simPos_${p.coin_id}">
       <span class="sim-pos-ticker">${p.ticker}</span>
-      <span class="sim-pos-qty">${parseFloat(p.quantity).toFixed(4)}</span>
+      <span class="sim-pos-qty">${parseFloat(p.qty).toFixed(4)}</span>
       <span class="sim-pos-entry">$${parseFloat(p.entry_price).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:6})}</span>
       <span class="sim-pos-current" id="simCur_${p.coin_id}">--</span>
       <span class="sim-pos-pnl" id="simPnl_${p.coin_id}">--</span>
-      <button class="sim-sell-btn" onclick="simSellPosition('${p.coin_id}','${p.ticker}',${p.quantity})">SELL ALL</button>
+      <button class="sim-sell-btn" onclick="simSellPosition('${p.coin_id}','${p.ticker}',${p.qty})">SELL ALL</button>
     </div>`).join('');
-  // Store positions for price polling
   if(simTrader) simTrader._positions = positions;
 }
 
@@ -2311,14 +2363,15 @@ function simRenderHistory(trades){
   el.innerHTML = `<table class="sim-hist-table">
     <thead><tr><th>COIN</th><th>TYPE</th><th>QTY</th><th>PRICE</th><th>P&L</th><th>TIME</th></tr></thead>
     <tbody>${trades.slice(0,50).map(t=>{
-      const pnl = t.realized_pnl!=null ? parseFloat(t.realized_pnl) : null;
+      const pnl = t.pnl != null ? parseFloat(t.pnl) : null;
+      const side = (t.side||t.trade_type||'').toUpperCase();
       return `<tr>
         <td>${t.ticker||t.coin_id}</td>
-        <td style="color:${t.trade_type==='buy'?'var(--green)':'var(--red)'};">${t.trade_type.toUpperCase()}</td>
-        <td>${parseFloat(t.quantity).toFixed(4)}</td>
+        <td style="color:${side==='BUY'?'var(--green)':'var(--red)'};">${side}</td>
+        <td>${parseFloat(t.qty||t.quantity||0).toFixed(4)}</td>
         <td>$${parseFloat(t.price).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:6})}</td>
         <td style="color:${pnl==null?'var(--dim)':pnl>=0?'var(--green)':'var(--red)'};">${pnl==null?'--':(pnl>=0?'+':'')+pnl.toFixed(2)}</td>
-        <td style="color:var(--dim);font-size:10px;">${timeAgo(new Date(t.created_at).getTime()/1000)}</td>
+        <td style="color:var(--dim);font-size:10px;">${timeAgo(Math.floor((t.ts||t.created_at||Date.now())/1000))}</td>
       </tr>`;
     }).join('')}</tbody></table>`;
 }
@@ -2331,27 +2384,26 @@ async function simLoadLeaderboard(){
     const r = await fetch(SIM_API+'/sim/leaderboard');
     if(!r.ok) throw r.status;
     const data = await r.json();
-    const traders = data.traders||[];
+    const traders = data.leaderboard||data.traders||[];
     const myId = simGetUUID();
-    const myRank = traders.findIndex(t=>t.trader_id===myId);
+    const myRank = traders.findIndex(t=>t.id===myId||t.trader_id===myId);
     const medals = ['🥇','🥈','🥉'];
     el.innerHTML = `<table class="sim-hist-table">
-      <thead><tr><th>RANK</th><th>TRADER</th><th>BALANCE</th><th>RETURN</th><th>TRADES</th></tr></thead>
+      <thead><tr><th>RANK</th><th>TRADER</th><th>BALANCE</th><th>RETURN</th></tr></thead>
       <tbody>${traders.slice(0,50).map((t,i)=>{
-        const isMe = t.trader_id===myId;
-        const ret = parseFloat(t.total_return_pct||0);
+        const isMe = t.id===myId||t.trader_id===myId;
+        const ret = parseFloat(t.return_pct||t.total_return_pct||0);
         return `<tr style="${isMe?'background:rgba(0,255,136,.07);border-left:2px solid var(--green);':''}">
           <td>${medals[i]||'#'+(i+1)}</td>
-          <td>${(t.display_name||'Anonymous')+(isMe?' <span style="color:var(--green);font-size:9px">(YOU)</span>':'')}</td>
+          <td>${(t.username||t.display_name||'Anonymous')+(isMe?' <span style="color:var(--green);font-size:9px">(YOU)</span>':'')}</td>
           <td>$${parseFloat(t.balance||10000).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
           <td style="color:${ret>=0?'var(--green)':'var(--red)'};">${(ret>=0?'+':'')+ret.toFixed(2)}%</td>
-          <td>${t.total_trades||0}</td>
         </tr>`;
       }).join('')}
       ${myRank===-1?`<tr style="background:rgba(0,255,136,.07);border-left:2px solid var(--green);">
         <td>--</td><td>You <span style="color:var(--green);font-size:9px">(YOU)</span></td>
-        <td>$${simTrader?parseFloat(simTrader.balance||10000).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'10,000.00'}</td>
-        <td style="color:var(--dim);">--</td><td>0</td>
+        <td>$${simTrader?(parseFloat((simTrader.trader||simTrader).balance||10000)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'10,000.00'}</td>
+        <td style="color:var(--dim);">--</td>
       </tr>`:''}
       </tbody></table>`;
   }catch(e){ el.innerHTML='<div style="color:var(--dim);font-size:11px;">Leaderboard unavailable</div>'; }
@@ -2382,29 +2434,37 @@ function simTab(tab){
 }
 
 function simSetCoin(coin){
+  if(!coin) return;
   simCurrentCoin = coin;
   const el = id => document.getElementById(id);
   if(el('simCoinSearch')) el('simCoinSearch').value = coin.ticker+' · '+coin.name;
   if(el('simCoinInfo')){
-    const settings = simGetSettings(coin.id);
+    const sigColor = coin.type==='bullish'?'var(--green)':coin.type==='bearish'?'var(--red)':'var(--yellow)';
+    const sigLabel = coin.signal==='moon'?'🚀 MOON':coin.signal==='dump'?'💀 DUMP':coin.signal==='trend'?'🔍 TREND':'👀 WATCH';
     el('simCoinInfo').innerHTML = `
       <span style="color:var(--green);font-weight:700">${coin.ticker}</span>
       <span style="color:var(--dim)"> · ${coin.name} · </span>
-      <span style="color:${coin.type==='bullish'?'var(--green)':coin.type==='bearish'?'var(--red)':'var(--yellow)'};">${coin.signal}</span>
+      <span style="color:${sigColor};">${sigLabel}</span>
       <span style="color:var(--dim)"> · $${coin.priceRaw?coin.priceRaw.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:8}):'--'}</span>
       <span style="color:var(--dim)"> · Hype ${coin.hype}/100</span>`;
   }
+  const settings = simGetSettings(coin.id);
   if(el('simAutoToggle')){
     const autoOn = settings.autoExecute||false;
     el('simAutoToggle').checked = autoOn;
     if(el('simAutoSettings')) el('simAutoSettings').style.display = autoOn?'block':'none';
   }
+  if(el('simTradeSize')) el('simTradeSize').value = settings.tradeSize||100;
   if(el('simMinConf')) el('simMinConf').value = settings.minConf||70;
   if(el('simMinConfVal')) el('simMinConfVal').textContent = (settings.minConf||70)+'%';
-  if(el('simTradeSize')) el('simTradeSize').value = settings.tradeSize||100;
   if(el('simAutoSell')) el('simAutoSell').checked = settings.autoSell||false;
   if(el('simAutoTP')) el('simAutoTP').checked = settings.autoTP||false;
   simUpdateCostPreview();
+  // Also fix share button for searched coins
+  if(coin.isLookup && typeof shareCoin !== 'undefined'){
+    // Make lookupCoin available to openShareModal
+    if(typeof lookupCoin !== 'undefined') window._simShareCoin = coin;
+  }
 }
 
 function simGetSettings(coinId){
@@ -2461,7 +2521,7 @@ async function simExecute(type){
   if(!price||price<=0){ simToast('No price data available','err'); return; }
   const qty = dollars/price;
   if(type==='sell'){
-    if(!confirm('Sell all '+qty.toFixed(4)+' '+simCurrentCoin.ticker+'? This closes your position.')) return;
+    if(!confirm('Sell '+simCurrentCoin.ticker+' position? This closes your position.')) return;
   }
   try{
     const r = await fetch(SIM_API+'/sim/trade', {
@@ -2470,15 +2530,16 @@ async function simExecute(type){
         trader_id: simGetUUID(),
         coin_id: simCurrentCoin.id,
         ticker: simCurrentCoin.ticker,
-        trade_type: type,
-        quantity: qty,
-        price: price
+        coin_name: simCurrentCoin.name||simCurrentCoin.ticker,
+        side: type.toUpperCase(),
+        qty: qty,
+        price: price,
+        hype_score: simCurrentCoin.hype||null
       })
     });
     if(!r.ok){ const err=await r.json(); throw err.error||r.status; }
     const result = await r.json();
-    simTrader = result;
-    simRenderPortfolio(result);
+    await simLoadPortfolio();
     simToast(type==='buy'?'✅ Bought '+qty.toFixed(4)+' '+simCurrentCoin.ticker:'✅ Sold '+simCurrentCoin.ticker, type==='buy'?'buy':'sell');
   }catch(e){ simToast('Trade failed: '+e,'err'); }
 }
@@ -2487,30 +2548,33 @@ async function simSellPosition(coinId, ticker, quantity){
   if(!confirm('Sell all '+parseFloat(quantity).toFixed(4)+' '+ticker+'? This closes your entire position.')) return;
   try{
     const price = await simFetchPrice(coinId);
+    if(!price||price<=0){ simToast('Could not fetch price','err'); return; }
     const r = await fetch(SIM_API+'/sim/trade', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         trader_id: simGetUUID(),
         coin_id: coinId,
         ticker: ticker,
-        trade_type: 'sell',
-        quantity: parseFloat(quantity),
+        coin_name: ticker,
+        side: 'SELL',
+        qty: parseFloat(quantity),
         price: price
       })
     });
     if(!r.ok){ const err=await r.json(); throw err.error||r.status; }
-    const result = await r.json();
-    simTrader = result;
-    simRenderPortfolio(result);
+    await simLoadPortfolio();
     simToast('✅ Sold '+ticker,'sell');
   }catch(e){ simToast('Sell failed: '+e,'err'); }
 }
 
 async function simFetchPrice(coinId){
   try{
-    const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd`);
-    const d = await r.json();
-    return d[coinId]?.usd||0;
+    const r = await fetch(SIM_API+'/cg/price?ids='+coinId);
+    if(r.ok){ const d=await r.json(); if(d[coinId]?.usd) return d[coinId].usd; }
+    // fallback direct
+    const r2 = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd`);
+    const d2 = await r2.json();
+    return d2[coinId]?.usd||0;
   }catch(e){ return 0; }
 }
 
@@ -2523,7 +2587,6 @@ async function simCheckAutoExecute(){
     if(!coin) continue;
     const minConf = settings.minConf||70;
     const tradeSize = settings.tradeSize||100;
-    // Auto-sell on signal flip
     if(settings.autoSell && coin.type!=='bullish'){
       const positions = simTrader?._positions||[];
       const pos = positions.find(p=>p.coin_id===coinId);
@@ -2532,20 +2595,19 @@ async function simCheckAutoExecute(){
         if(price>0){
           await fetch(SIM_API+'/sim/trade', {
             method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({trader_id:simGetUUID(),coin_id:coinId,ticker:coin.ticker,trade_type:'sell',quantity:parseFloat(pos.quantity),price})
+            body: JSON.stringify({trader_id:simGetUUID(),coin_id:coinId,ticker:coin.ticker,coin_name:coin.name||coin.ticker,side:'SELL',qty:parseFloat(pos.qty),price})
           }).catch(()=>{});
         }
       }
       continue;
     }
-    // Auto-buy on BUY signal with confidence threshold
     if(coin.type==='bullish' && coin.hype>=minConf){
       const price = coin.priceRaw||0;
       if(price>0){
         const qty = tradeSize/price;
         await fetch(SIM_API+'/sim/trade', {
           method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({trader_id:simGetUUID(),coin_id:coinId,ticker:coin.ticker,trade_type:'buy',quantity:qty,price})
+          body: JSON.stringify({trader_id:simGetUUID(),coin_id:coinId,ticker:coin.ticker,coin_name:coin.name||coin.ticker,side:'BUY',qty,price})
         }).catch(()=>{});
       }
     }
@@ -2567,7 +2629,8 @@ async function simPollPrices(){
   if(!positions.length) return;
   const ids = positions.map(p=>p.coin_id).join(',');
   try{
-    const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
+    const r = await fetch(SIM_API+'/cg/price?ids='+ids);
+    if(!r.ok) return;
     const prices = await r.json();
     positions.forEach(p=>{
       const curPrice = prices[p.coin_id]?.usd;
@@ -2576,7 +2639,7 @@ async function simPollPrices(){
       const pnlEl = document.getElementById('simPnl_'+p.coin_id);
       if(curEl) curEl.textContent = '$'+curPrice.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:6});
       if(pnlEl){
-        const pnl = (curPrice - parseFloat(p.entry_price)) * parseFloat(p.quantity);
+        const pnl = (curPrice - parseFloat(p.entry_price)) * parseFloat(p.qty);
         pnlEl.textContent = (pnl>=0?'+':'')+'$'+pnl.toFixed(2);
         pnlEl.style.color = pnl>=0?'var(--green)':'var(--red)';
       }
@@ -2589,11 +2652,10 @@ async function simResetAccount(){
   try{
     const r = await fetch(SIM_API+'/sim/reset', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({trader_id: simGetUUID()})
+      body: JSON.stringify({ id: simGetUUID() })
     });
     if(!r.ok) throw r.status;
-    simTrader = await r.json();
-    simRenderPortfolio(simTrader);
+    await simLoadPortfolio();
     simToast('Account reset to $10,000','');
   }catch(e){ simToast('Reset failed','err'); }
 }
@@ -2603,7 +2665,10 @@ async function simSaveName(){
   const name = nameEl?.value?.trim();
   if(!name){ simToast('Enter a display name','err'); return; }
   try{
-    const r = await fetch(SIM_API+'/sim/portfolio?trader_id='+simGetUUID()+'&display_name='+encodeURIComponent(name));
+    const r = await fetch(SIM_API+'/sim/init', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id: simGetUUID(), username: name })
+    });
     if(!r.ok) throw r.status;
     simToast('Name saved! You\'re on the leaderboard 🏆','');
   }catch(e){ simToast('Saved locally',''); }
@@ -2612,8 +2677,8 @@ async function simSaveName(){
 function simRenderWatchlistChips(){
   const el = document.getElementById('simWatchlistChips');
   if(!el) return;
-  const wl = watchlist.getAll();
-  if(!wl.length){ el.innerHTML='<span style="color:var(--dim);font-size:10px;">No watchlist coins yet — add coins from the main list</span>'; return; }
+  const wl = (typeof watchlist !== 'undefined') ? watchlist.getAll() : [];
+  if(!wl.length){ el.innerHTML='<span style="color:var(--dim);font-size:10px;">No watchlist coins — add coins from the main list</span>'; return; }
   el.innerHTML = wl.map(id=>{
     const coin = coins.find(c=>c.id===id);
     const ticker = coin?coin.ticker:id.toUpperCase().slice(0,6);
@@ -2626,7 +2691,7 @@ async function simLoadWatchlistCoin(coinId){
   let coin = coins.find(c=>c.id===coinId);
   if(!coin){
     try{
-      const r = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinId}&sparkline=false`);
+      const r = await fetch(SIM_API+'/cg/coin?id='+coinId);
       const data = await r.json();
       if(data&&data[0]){
         const c = data[0];
@@ -2641,14 +2706,12 @@ async function simSearchCoin(){
   const si = document.getElementById('simCoinSearch');
   const q = si?.value?.trim();
   if(!q) return;
-  // Check live coins first
   const local = coins.filter(c=>c.ticker.toLowerCase().includes(q.toLowerCase())||c.name.toLowerCase().includes(q.toLowerCase()));
   if(local.length){ simSetCoin(local[0]); return; }
-  // Search CoinGecko
   const resultsEl = document.getElementById('simSearchResults');
   if(resultsEl) resultsEl.innerHTML = '<div style="color:var(--dim);font-size:10px;padding:4px">Searching...</div>';
   try{
-    const r = await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(q)}`);
+    const r = await fetch(SIM_API+'/cg/search?q='+encodeURIComponent(q));
     const d = await r.json();
     const results = (d.coins||[]).slice(0,5);
     simSearchResults(results);
@@ -2674,11 +2737,14 @@ async function simSelectSearchResult(coinId, ticker, name){
   const si = document.getElementById('simCoinSearch');
   if(si) si.value = ticker+' · '+name;
   try{
-    const r = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinId}&sparkline=false`);
+    const r = await fetch(SIM_API+'/cg/coin?id='+coinId);
     const data = await r.json();
     if(data&&data[0]){
       const c = data[0];
-      const coin = {id:c.id,ticker:c.symbol.toUpperCase(),name:c.name,priceRaw:c.current_price,hype:50,type:'neutral',signal:'watch'};
+      const ch = c.price_change_percentage_24h||0;
+      const type = ch>5?'bullish':ch<-8?'bearish':'neutral';
+      const signal = type==='bullish'?'moon':type==='bearish'?'dump':'watch';
+      const coin = {id:c.id,ticker:c.symbol.toUpperCase(),name:c.name,priceRaw:c.current_price,hype:50,type,signal,isLookup:true};
       simSetCoin(coin);
     }
   }catch(e){ simToast('Could not load coin data','err'); }
@@ -2693,6 +2759,7 @@ function simToast(msg, type){
   el.style.display='block';
   setTimeout(()=>{ el.style.display='none'; }, 3000);
 }
+
 // Close simulator on backdrop click
 document.addEventListener('DOMContentLoaded',()=>{
   const backdrop = document.getElementById('simModal');
