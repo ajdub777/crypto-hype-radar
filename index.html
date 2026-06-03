@@ -1727,6 +1727,10 @@ function renderCoins(){
         <div class="trade-btn-left"><span>⚡ TRADE ${c.ticker}</span><span class="trade-btn-exch">ON ${exch.name.toUpperCase()}</span></div>
         <span class="trade-btn-arrow">→</span>
       </a>`:''}
+      <button class="trade-btn" style="background:rgba(0,255,136,.04);border-color:rgba(0,255,136,.2);margin-top:6px;" onclick="event.stopPropagation();openSimulator(coins.find(x=>x.id==='${c.id}'))">
+        <div class="trade-btn-left"><span>🎮 PAPER TRADE ${c.ticker}</span></div>
+        <span class="trade-btn-arrow">→</span>
+      </button>
       <div class="coin-detail">
         <div class="detail-cell"><div class="detail-lbl">Market Cap</div><div class="detail-val">${c.mcap}</div></div>
         <div class="detail-cell"><div class="detail-lbl">Volume 24h</div><div class="detail-val">${c.vol}</div></div>
@@ -2409,11 +2413,14 @@ async function simLoadLeaderboard(){
   }catch(e){ el.innerHTML='<div style="color:var(--dim);font-size:11px;">Leaderboard unavailable</div>'; }
 }
 
-function openSimulator(){
+function openSimulator(coinOverride){
   document.getElementById('simModal').style.display='flex';
+  simTab('trade');
   simInit().then(()=>{ simLoadPortfolio(); simRenderWatchlistChips(); });
   simStartPricePolling();
-  simTab('trade');
+  // Load coin: use override (from TRADE button), else use currently selected coin
+  const coinToLoad = coinOverride || selected;
+  if(coinToLoad) simSetCoin(coinToLoad);
 }
 
 function closeSimulator(){
@@ -2436,6 +2443,8 @@ function simTab(tab){
 function simSetCoin(coin){
   if(!coin) return;
   simCurrentCoin = coin;
+  // Ensure Trade tab is active so all elements are in the DOM
+  simTab('trade');
   const el = id => document.getElementById(id);
   if(el('simCoinSearch')) el('simCoinSearch').value = coin.ticker+' · '+coin.name;
   if(el('simCoinInfo')){
@@ -2482,16 +2491,18 @@ function simSaveSettings(coinId, settings){
 
 function simUpdateCostPreview(){
   const sizeEl = document.getElementById('simTradeSize');
-  const previewEl = document.getElementById('simCostPreview');
-  if(!sizeEl||!previewEl) return;
-  const dollars = parseFloat(sizeEl.value)||100;
-  if(simCurrentCoin&&simCurrentCoin.priceRaw&&simCurrentCoin.priceRaw>0){
-    const qty = dollars/simCurrentCoin.priceRaw;
-    previewEl.textContent = '~'+qty.toFixed(4)+' '+simCurrentCoin.ticker+' · Cost: $'+dollars.toFixed(2);
-  } else {
-    previewEl.textContent = 'Cost: $'+dollars.toFixed(2);
+  const dollars = parseFloat(sizeEl?.value||100);
+  const preview = document.getElementById('simCostPreview');
+  if(preview){
+    if(simCurrentCoin&&simCurrentCoin.priceRaw){
+      const qty = dollars/simCurrentCoin.priceRaw;
+      preview.textContent = qty.toFixed(4)+' '+simCurrentCoin.ticker+' · Cost: $'+dollars.toFixed(2);
+    } else {
+      preview.textContent = 'Cost: $'+dollars.toFixed(2);
+    }
   }
 }
+
 
 function simToggleAutoExecute(){
   const on = document.getElementById('simAutoToggle').checked;
@@ -2739,7 +2750,7 @@ async function simSelectSearchResult(coinId, ticker, name){
   const resultsEl = document.getElementById('simSearchResults');
   if(resultsEl) resultsEl.innerHTML='';
   const si = document.getElementById('simCoinSearch');
-  if(si) si.value = ticker+' · '+name;
+  if(si){ si.value = ticker+' · '+name; si.blur(); }
   try{
     const r = await fetch(SIM_API+'/cg/coin?id='+coinId);
     const data = await r.json();
