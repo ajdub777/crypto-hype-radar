@@ -2434,8 +2434,7 @@ async function simLoadLeaderboard(){
 function openSimulator(coinOverride){
   document.getElementById('simModal').style.display='flex';
   simTab('trade');
-  simInit().then(()=>{ simLoadPortfolio(); simRenderWatchlistChips(); });
-  simStartPricePolling();
+  simInit().then(()=>{ simLoadPortfolio().then(()=>{ simStartPricePolling(); }); simRenderWatchlistChips(); });
   // Load coin: use override (from TRADE button), else use currently selected coin
   const coinToLoad = coinOverride || selected;
   if(coinToLoad) simSetCoin(coinToLoad);
@@ -2848,7 +2847,7 @@ document.addEventListener('DOMContentLoaded',()=>{
           <span class="sim-auto-label">AUTO-EXECUTE BUY signals for this coin</span>
           <input type="checkbox" class="sim-toggle" id="simAutoToggle" onchange="simToggleAutoExecute()">
         </div>
-        <div class="sim-auto-row" style="margin-top:6px;opacity:.45;cursor:not-allowed;" title="Coming soon">
+        <div class="sim-auto-row" style="margin-top:6px;opacity:.75;cursor:not-allowed;" title="Coming soon">
           <span class="sim-auto-label" style="color:var(--blue)">🤖 AI DECIDE — Let AI trade this for you</span>
           <span style="font-family:'Orbitron',monospace;font-size:8px;color:var(--blue);letter-spacing:1px;border:1px solid var(--blue);padding:2px 6px;">SOON</span>
         </div>
