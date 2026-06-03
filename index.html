@@ -621,7 +621,7 @@ header{padding:22px 0;border-bottom:1px solid rgba(0,212,255,0.12);background:li
      <button class="fbtn" onclick="setFilter('bullish',this)">🚀 MOONING</button>
      <button class="fbtn" onclick="setFilter('bearish',this)">💀 DUMPING</button>
      <button class="fbtn" onclick="setFilter('neutral',this)">👀 WATCH</button>
-     <button class="fbtn" id="watchlistFilterBtn" onclick="setFilter('watchlist',this)" style="border-color:rgba(191,90,242,.4);color:var(--purple);flex-shrink:0;">🔔 MY LIST <span id="watchlistCount" style="background:var(--purple);color:var(--bg);border-radius:10px;padding:1px 6px;font-size:9px;margin-left:3px;display:none;">0</span></button>
+     <button class="fbtn" id="watchlistFilterBtn" onclick="setFilter('watchlist',this)" style="border-color:rgba(191,90,242,.4);color:var(--purple);flex-shrink:0;">🔖 SAVED LIST <span id="watchlistCount" style="background:var(--purple);color:var(--bg);border-radius:10px;padding:1px 6px;font-size:9px;margin-left:3px;display:none;">0</span></button>
     </div>
     <div class="sort-wrap">
      <span class="sort-lbl">SORT:</span>
@@ -1674,9 +1674,9 @@ function renderCoins(){
   if(lookupCoin&&!vis.find(c=>c.id===lookupCoin.id)){vis=[lookupCoin,...vis];}
   if(filter==='watchlist'&&!q&&!vis.length){
     list.innerHTML=`<div class="empty" style="padding:40px 20px;">
-      <div style="font-size:28px;margin-bottom:10px;">🔔</div>
-      <div style="color:var(--purple);font-family:'Orbitron',monospace;font-size:11px;letter-spacing:2px;margin-bottom:8px;">WATCHLIST IS EMPTY</div>
-      <div style="font-size:12px;line-height:1.6;color:var(--dim);">Click 🔔 on any coin card to add it.<br>Saves to your browser — no login needed.</div>
+      <div style="font-size:28px;margin-bottom:10px;">🔖</div>
+      <div style="color:var(--purple);font-family:'Orbitron',monospace;font-size:11px;letter-spacing:2px;margin-bottom:8px;">SAVED LIST IS EMPTY</div>
+      <div style="font-size:12px;line-height:1.6;color:var(--dim);">Click 🔖 on any coin card to save it.<br>Saves to your browser — no login needed.</div>
     </div>`;
     return;
   }
@@ -1704,9 +1704,9 @@ function renderCoins(){
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <button onclick="event.stopPropagation();openShareModal('${c.id}')" title="Share signal" class="share-card-btn"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="2.5" r="1.5"/><circle cx="10.5" cy="10.5" r="1.5"/><circle cx="2.5" cy="6.5" r="1.5"/><line x1="4" y1="6.5" x2="9" y2="3.2"/><line x1="4" y1="6.5" x2="9" y2="9.8"/></svg></button>
-          <button onclick="event.stopPropagation();toggleWatch('${c.id}')" title="${isWatched?'Remove from watchlist':'Add to watchlist'}"
+          <button onclick="event.stopPropagation();toggleWatch('${c.id}')" title="${isWatched?'Remove from Saved List':'Save to list'}"
             style="background:${isWatched?'rgba(191,90,242,.2)':'transparent'};border:1px solid ${isWatched?'var(--purple)':'var(--border)'};color:${isWatched?'var(--purple)':'var(--dim)'};width:28px;height:28px;cursor:pointer;border-radius:4px;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;">
-            🔔
+            ${isWatched?'🔖':'🔖'}
           </button>
           <div class="price-block">
             ${makeSparklineSVG(c.sparkline,c.changeDir==='up')}
@@ -1920,8 +1920,12 @@ async function renderAnalysis(c){
   document.getElementById('analysisLabel').textContent=c.ticker+' · '+c.name;
   const box=document.getElementById('decisionBox');
   box.innerHTML=`<div class="thinking"><span>COMPUTING SIGNAL</span><span class="dots"><span>.</span><span>.</span><span>.</span></span></div>`;
-  // Fetch enrichment (Binance → CoinGecko fallback) in parallel with loading animation
-  const [enrichment]=await Promise.all([fetchEnrichment(c),new Promise(r=>setTimeout(r,700))]);
+  // Fetch enrichment and radar history in parallel
+  const [enrichment, radarData]=await Promise.all([
+    fetchEnrichment(c),
+    fetch(SIM_API+'/radar/coin?id='+c.id).then(r=>r.ok?r.json():null).catch(()=>null),
+    new Promise(r=>setTimeout(r,700))
+  ]);
   const ch=c.ch24,hype=c.hype,redditHit=c.badges.includes('reddit'),isTrend=c.isTrend;
     let score=0;
     if(ch>20)score+=3;else if(ch>8)score+=2;else if(ch>2)score+=1;
@@ -2060,12 +2064,26 @@ async function renderAnalysis(c){
         <div class="risk-bar-lbl"><span style="color:${riskColor}">${riskLevel}</span><span>${riskPct}%</span></div>
         <div class="risk-bar"><div class="risk-fill" style="width:${riskPct}%;background:${riskFillColor};"></div></div>
       </div>
+      ${(()=>{
+        if(!radarData||!radarData.first_seen_price||!c.priceRaw) return '';
+        const firstPrice = parseFloat(radarData.first_seen_price);
+        const nowPrice = c.priceRaw;
+        const pct = ((nowPrice - firstPrice)/firstPrice*100);
+        const daysAgo = radarData.first_seen_ts ? Math.floor((Date.now()/1000 - radarData.first_seen_ts)/86400) : null;
+        const pctColor = pct>=0?'var(--green)':'var(--red)';
+        const daysStr = daysAgo!==null?(daysAgo===0?'today':daysAgo===1?'1 day ago':daysAgo+' days ago'):'recently';
+        return `<div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--dim);margin:8px 0;padding:8px;background:rgba(0,212,255,.04);border:1px solid rgba(0,212,255,.12);">
+          📡 <span style="color:var(--blue)">First on CHR radar</span> ${daysStr} at <span style="color:var(--text)">${fmtP(firstPrice)}</span> · Now: <span style="color:var(--text)">${fmtP(nowPrice)}</span> · <span style="color:${pctColor};font-weight:700">${pct>=0?'+':''}${pct.toFixed(1)}% since radar</span></div>`;
+      })()}
       <div class="context-text">${context}</div>
       ${(decClass==='buy')?`<a class="trade-btn" href="${getExchangeForCoin(c.id).url}" target="_blank" rel="noopener noreferrer" style="margin-bottom:0;">
         <div class="trade-btn-left"><span>⚡ TRADE ${c.ticker}</span><span class="trade-btn-exch">ON ${getExchangeForCoin(c.id).name.toUpperCase()}</span></div>
         <span class="trade-btn-arrow">→</span>
       </a>`:''}
-      <button class="watch-btn" onclick="openModal('${c.id}')">🔔 ALERT ME WHEN THIS MOVES</button>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="watch-btn" onclick="toggleWatch('${c.id}');renderCoins();" style="flex:1;background:${watchlist.has(c.id)?'rgba(191,90,242,.15)':'transparent'};border-color:${watchlist.has(c.id)?'var(--purple)':'rgba(191,90,242,.4)'};color:${watchlist.has(c.id)?'var(--purple)':'rgba(191,90,242,.8)'}">${watchlist.has(c.id)?'🔖 SAVED TO LIST':'🔖 SAVE TO LIST'}</button>
+      <button class="watch-btn" onclick="openModal('${c.id}')" style="flex:1;">🔔 ALERT ME WHEN THIS MOVES</button>
+      </div>
       <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--dim);margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">⚠ NOT FINANCIAL ADVICE · DYOR · Crypto is high risk</div>`;
   setCoinGauge(c,score);
 }
@@ -2637,8 +2655,11 @@ function simStopPricePolling(){
 
 async function simPollPrices(){
   const positions = simTrader?._positions||[];
-  if(!positions.length) return;
-  const ids = positions.map(p=>p.coin_id).join(',');
+  // Also include saved list coins so their prices stay current
+  const savedIds = (typeof watchlist !== 'undefined') ? watchlist.ids() : [];
+  const allIds = [...new Set([...positions.map(p=>p.coin_id), ...savedIds])].join(',');
+  const ids = allIds;
+  if(!ids) return;
   try{
     const r = await fetch(SIM_API+'/cg/price?ids='+ids);
     if(!r.ok) return;
@@ -2688,8 +2709,8 @@ async function simSaveName(){
 function simRenderWatchlistChips(){
   const el = document.getElementById('simWatchlistChips');
   if(!el) return;
-  const wl = (typeof watchlist !== 'undefined') ? watchlist.getAll() : [];
-  if(!wl.length){ el.innerHTML='<span style="color:var(--dim);font-size:10px;">No watchlist coins — add coins from the main list</span>'; return; }
+  const wl = (typeof watchlist !== 'undefined') ? watchlist.ids() : [];
+  if(!wl.length){ el.innerHTML='<span style="color:var(--dim);font-size:10px;">No saved coins — click 🔖 on any coin card to save it</span>'; return; }
   el.innerHTML = wl.map(id=>{
     const coin = coins.find(c=>c.id===id);
     const ticker = coin?coin.ticker:id.toUpperCase().slice(0,6);
@@ -2809,7 +2830,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       </div>
       <div class="sim-section">
         <div class="sim-section-title">⚡ EXECUTE SIGNAL</div>
-        <div class="sim-watchlist-chips" id="simWatchlistChips"></div>
+        <div class="sim-saved-chips" id="simWatchlistChips"></div>
         <div class="sim-search-row">
           <input class="sim-search-input" id="simCoinSearch" placeholder="Search any coin by name or ticker..." oninput="simSearchCoin()" autocomplete="off">
           <button class="sim-search-btn" onclick="simSearchCoin()">🔍</button>
@@ -2826,6 +2847,10 @@ document.addEventListener('DOMContentLoaded',()=>{
         <div class="sim-auto-row">
           <span class="sim-auto-label">AUTO-EXECUTE BUY signals for this coin</span>
           <input type="checkbox" class="sim-toggle" id="simAutoToggle" onchange="simToggleAutoExecute()">
+        </div>
+        <div class="sim-auto-row" style="margin-top:6px;opacity:.45;cursor:not-allowed;" title="Coming soon">
+          <span class="sim-auto-label" style="color:var(--blue)">🤖 AI DECIDE — Let AI trade this for you</span>
+          <span style="font-family:'Orbitron',monospace;font-size:8px;color:var(--blue);letter-spacing:1px;border:1px solid var(--blue);padding:2px 6px;">SOON</span>
         </div>
         <div class="sim-auto-settings" id="simAutoSettings" style="display:none">
           <label>MIN CONFIDENCE — Only auto-buy if signal confidence ≥ <span id="simMinConfVal">70%</span></label>

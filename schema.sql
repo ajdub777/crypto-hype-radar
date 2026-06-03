@@ -1,5 +1,5 @@
 -- ── Hype Trader Simulator — D1 Schema ────────────────────────────────────────
--- Tables: traders, positions, trades
+-- Tables: traders, positions, trades, coin_radar, saved_list, coin_prices
 -- No auth required — users identified by a UUID stored in localStorage
 
 -- Trader accounts (anonymous, UUID-based)
@@ -46,7 +46,45 @@ CREATE TABLE IF NOT EXISTS trades (
   ts           INTEGER NOT NULL          -- unix ms
 );
 
--- Indexes for fast lookups
-CREATE INDEX IF NOT EXISTS idx_positions_trader ON positions(trader_id);
-CREATE INDEX IF NOT EXISTS idx_trades_trader    ON trades(trader_id);
-CREATE INDEX IF NOT EXISTS idx_trades_ts        ON trades(ts DESC);
+-- ── Radar history — every coin that ever appeared in the top 15 scan ─────────
+-- Used to track coins after they fall off the trending list
+CREATE TABLE IF NOT EXISTS coin_radar (
+  coin_id       TEXT PRIMARY KEY,        -- CoinGecko id
+  ticker        TEXT NOT NULL,
+  coin_name     TEXT NOT NULL,
+  image_url     TEXT,
+  first_seen_ts INTEGER NOT NULL,        -- unix ms when first detected on radar
+  first_seen_price REAL,                 -- price when first detected
+  last_seen_ts  INTEGER NOT NULL,        -- unix ms of last scan appearance
+  last_signal   TEXT,                    -- 'moon','dump','trend','watch'
+  last_hype     INTEGER,
+  last_price    REAL,
+  updated_at    INTEGER NOT NULL
+);
+
+-- ── Per-user saved list (replaces localStorage watchlist) ────────────────────
+CREATE TABLE IF NOT EXISTS saved_list (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  trader_id   TEXT NOT NULL,             -- same UUID as traders table
+  coin_id     TEXT NOT NULL,
+  ticker      TEXT NOT NULL,
+  coin_name   TEXT NOT NULL,
+  saved_at    INTEGER NOT NULL,
+  UNIQUE(trader_id, coin_id)
+);
+
+-- ── Latest prices cache (updated by cron every 5 min) ────────────────────────
+-- Covers all coins in coin_radar + any coin in open positions or saved_list
+CREATE TABLE IF NOT EXISTS coin_prices (
+  coin_id     TEXT PRIMARY KEY,
+  price_usd   REAL NOT NULL,
+  change_24h  REAL,
+  updated_at  INTEGER NOT NULL
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_positions_trader  ON positions(trader_id);
+CREATE INDEX IF NOT EXISTS idx_trades_trader     ON trades(trader_id);
+CREATE INDEX IF NOT EXISTS idx_trades_ts         ON trades(ts DESC);
+CREATE INDEX IF NOT EXISTS idx_saved_trader      ON saved_list(trader_id);
+CREATE INDEX IF NOT EXISTS idx_radar_last_seen   ON coin_radar(last_seen_ts DESC);

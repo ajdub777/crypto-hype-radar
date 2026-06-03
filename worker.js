@@ -179,6 +179,25 @@ export default {
       return handleRedditHot(url, env);
     }
 
+    // ── Saved List (D1-backed, replaces localStorage watchlist) ──────────────
+    if (url.pathname === '/saved/add' && request.method === 'POST') {
+      return handleSavedAdd(request, env);
+    }
+    if (url.pathname === '/saved/remove' && request.method === 'POST') {
+      return handleSavedRemove(request, env);
+    }
+    if (url.pathname === '/saved/list' && request.method === 'GET') {
+      return handleSavedList(request, env);
+    }
+
+    // ── Coin radar history ────────────────────────────────────────────────────
+    if (url.pathname === '/radar/coin' && request.method === 'GET') {
+      return handleRadarCoin(request, env);
+    }
+    if (url.pathname === '/radar/prices' && request.method === 'GET') {
+      return handleRadarPrices(request, env);
+    }
+
     return new Response('Crypto Hype Radar — Webhook Proxy', {
       headers: { 'Content-Type': 'text/plain' }
     });
@@ -186,7 +205,7 @@ export default {
 
   // ── Scheduled cron handler ──────────────────────────────────────────────────
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runSignalScan(env));
+    ctx.waitUntil(runFullCron(env));
   }
 };
 
@@ -747,4 +766,312 @@ async function fetchRedditOAuth(sub, limit, env) {
       selftext: (p.selftext || '').slice(0, 200),
       upvote_ratio: p.upvote_ratio || 0
     }));
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// SAVED LIST HANDLERS (D1-backed, replaces localStorage watchlist)
+// ════════════════════════════════════════════════════════════════════════════
+
+// POST /saved/add  { trader_id, coin_id, ticker, coin_name }
+async function handleSavedAdd(request, env) {
+  let data = {};
+  try { data = await request.json(); } catch(e) {}
+  const { trader_id, coin_id, ticker, coin_name } = data;
+  if (!trader_id || !coin_id) return json({ error: 'trader_id and coin_id required' }, 400);
+  const now = Date.now();
+  try {
+    await env.HYPE_TRADER.prepare(
+      `INSERT OR IGNORE INTO saved_list (trader_id, coin_id, ticker, coin_name, saved_at)
+       VALUES (?, ?, ?, ?, ?)`
+    ).bind(trader_id, coin_id, (ticker||coin_id).toUpperCase(), coin_name||coin_id, now).run();
+    return json({ ok: true });
+  } catch(e) {
+    return json({ error: e.message }, 500);
+  }
+}
+
+// POST /saved/remove  { trader_id, coin_id }
+async function handleSavedRemove(request, env) {
+  let data = {};
+  try { data = await request.json(); } catch(e) {}
+  const { trader_id, coin_id } = data;
+  if (!trader_id || !coin_id) return json({ error: 'trader_id and coin_id required' }, 400);
+  try {
+    await env.HYPE_TRADER.prepare(
+      `DELETE FROM saved_list WHERE trader_id = ? AND coin_id = ?`
+    ).bind(trader_id, coin_id).run();
+    return json({ ok: true });
+  } catch(e) {
+    return json({ error: e.message }, 500);
+  }
+}
+
+// GET /saved/list?id=<trader_id>
+async function handleSavedList(request, env) {
+  const url = new URL(request.url);
+  const id = url.searchParams.get('id');
+  if (!id) return json({ error: 'id required' }, 400);
+  try {
+    const rows = await env.HYPE_TRADER.prepare(
+      `SELECT sl.coin_id, sl.ticker, sl.coin_name, sl.saved_at,
+              cr.first_seen_price, cr.first_seen_ts, cr.last_signal, cr.last_hype,
+              cp.price_usd AS current_price, cp.change_24h, cp.updated_at AS price_updated
+       FROM saved_list sl
+       LEFT JOIN coin_radar cr ON cr.coin_id = sl.coin_id
+       LEFT JOIN coin_prices cp ON cp.coin_id = sl.coin_id
+       WHERE sl.trader_id = ?
+       ORDER BY sl.saved_at DESC`
+    ).bind(id).all();
+    return json({ saved: rows.results || [] });
+  } catch(e) {
+    return json({ error: e.message }, 500);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// RADAR COIN HANDLERS
+// ════════════════════════════════════════════════════════════════════════════
+
+// GET /radar/coin?id=<coin_id>  — returns radar history for a single coin
+async function handleRadarCoin(request, env) {
+  const url = new URL(request.url);
+  const id = url.searchParams.get('id');
+  if (!id) return json({ error: 'id required' }, 400);
+  try {
+    const row = await env.HYPE_TRADER.prepare(
+      `SELECT cr.*, cp.price_usd AS current_price, cp.change_24h, cp.updated_at AS price_updated
+       FROM coin_radar cr
+       LEFT JOIN coin_prices cp ON cp.coin_id = cr.coin_id
+       WHERE cr.coin_id = ?`
+    ).bind(id).first();
+    if (!row) return json({ found: false });
+    return json({ found: true, coin: row });
+  } catch(e) {
+    return json({ error: e.message }, 500);
+  }
+}
+
+// GET /radar/prices?ids=<comma-separated coin_ids>  — bulk price lookup from D1
+async function handleRadarPrices(request, env) {
+  const url = new URL(request.url);
+  const ids = (url.searchParams.get('ids') || '').split(',').filter(Boolean).slice(0, 50);
+  if (!ids.length) return json({ prices: {} });
+  try {
+    const placeholders = ids.map(() => '?').join(',');
+    const rows = await env.HYPE_TRADER.prepare(
+      `SELECT coin_id, price_usd, change_24h, updated_at FROM coin_prices WHERE coin_id IN (${placeholders})`
+    ).bind(...ids).all();
+    const prices = {};
+    (rows.results || []).forEach(r => { prices[r.coin_id] = { usd: r.price_usd, change_24h: r.change_24h, updated_at: r.updated_at }; });
+    return json({ prices });
+  } catch(e) {
+    return json({ error: e.message }, 500);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// FULL CRON JOB — runs every 5 minutes via Cloudflare scheduled trigger
+// 1. Fetch trending coins from CoinGecko
+// 2. Upsert into coin_radar (first_seen, last_seen, signal, price)
+// 3. Collect all coins needing price updates (radar + open positions + saved list)
+// 4. Batch-fetch prices from CoinGecko, store in coin_prices
+// 5. Check for signal flips on saved/held coins → push alerts
+// ════════════════════════════════════════════════════════════════════════════
+async function runFullCron(env) {
+  try {
+    // ── Step 1: Fetch trending + gainers ──────────────────────────────────────
+    const [trendingRes, gainersRes] = await Promise.all([
+      fetch('https://api.coingecko.com/api/v3/search/trending', {
+        headers: { 'Accept': 'application/json', 'User-Agent': 'CryptoHypeRadar/1.0' }
+      }),
+      fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=percent_change_24h_desc&per_page=20&page=1&sparkline=false&price_change_percentage=24h', {
+        headers: { 'Accept': 'application/json', 'User-Agent': 'CryptoHypeRadar/1.0' }
+      })
+    ]);
+
+    if (!trendingRes.ok) {
+      console.error('[CHR cron] Trending fetch failed:', trendingRes.status);
+      return;
+    }
+
+    const trendingData = await trendingRes.json();
+    const trendingCoins = (trendingData.coins || []).slice(0, 15).map(c => c.item);
+    const gainers = gainersRes.ok ? await gainersRes.json() : [];
+
+    // ── Step 2: Build score map and signal map ────────────────────────────────
+    const scoreMap = {};
+    trendingCoins.forEach((coin, i) => {
+      const id = coin.id;
+      if (!scoreMap[id]) scoreMap[id] = {
+        id, name: coin.name, symbol: coin.symbol?.toUpperCase() || id,
+        image: coin.thumb || coin.large || '',
+        score: 0, price_change: 0, price: coin.data?.price || 0
+      };
+      scoreMap[id].score += Math.max(1, 4 - Math.floor(i / 2));
+    });
+    gainers.forEach(coin => {
+      const id = coin.id;
+      const change = coin.price_change_percentage_24h || 0;
+      if (!scoreMap[id]) scoreMap[id] = {
+        id, name: coin.name, symbol: coin.symbol?.toUpperCase() || id,
+        image: coin.image || '',
+        score: 0, price_change: change, price: coin.current_price || 0
+      };
+      scoreMap[id].price_change = change;
+      scoreMap[id].price = scoreMap[id].price || coin.current_price || 0;
+      if (change >= 20) scoreMap[id].score += 3;
+      else if (change >= 10) scoreMap[id].score += 2;
+      else if (change >= 5) scoreMap[id].score += 1;
+    });
+
+    const signalFor = (score, change) => {
+      if (score >= 6 && change >= 10) return 'moon';
+      if (change <= -15) return 'dump';
+      if (score >= 4) return 'trend';
+      return 'watch';
+    };
+
+    const now = Date.now();
+    const radarCoins = Object.values(scoreMap);
+    const radarIds = radarCoins.map(c => c.id);
+
+    // ── Step 3: Upsert coin_radar ─────────────────────────────────────────────
+    for (const coin of radarCoins) {
+      const signal = signalFor(coin.score, coin.price_change);
+      const hype = Math.min(99, Math.round((coin.score / 10) * 100));
+      try {
+        await env.HYPE_TRADER.prepare(
+          `INSERT INTO coin_radar (coin_id, ticker, coin_name, image_url, first_seen_ts, first_seen_price, last_seen_ts, last_signal, last_hype, last_price, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(coin_id) DO UPDATE SET
+             last_seen_ts = excluded.last_seen_ts,
+             last_signal = excluded.last_signal,
+             last_hype = excluded.last_hype,
+             last_price = CASE WHEN excluded.last_price > 0 THEN excluded.last_price ELSE coin_radar.last_price END,
+             updated_at = excluded.updated_at`
+        ).bind(
+          coin.id, coin.symbol, coin.name, coin.image,
+          now, coin.price > 0 ? coin.price : null,
+          now, signal, hype,
+          coin.price > 0 ? coin.price : null,
+          now
+        ).run();
+      } catch(e) {
+        console.warn('[CHR cron] coin_radar upsert failed for', coin.id, e.message);
+      }
+    }
+
+    // ── Step 4: Collect all coin IDs needing price updates ───────────────────
+    // radar coins + open positions + saved list
+    const positionRows = await env.HYPE_TRADER.prepare(
+      `SELECT DISTINCT coin_id FROM positions`
+    ).all();
+    const savedRows = await env.HYPE_TRADER.prepare(
+      `SELECT DISTINCT coin_id FROM saved_list`
+    ).all();
+
+    const allIds = new Set([
+      ...radarIds,
+      ...(positionRows.results || []).map(r => r.coin_id),
+      ...(savedRows.results || []).map(r => r.coin_id)
+    ]);
+
+    // Batch into groups of 50 (CoinGecko simple/price limit)
+    const idArray = [...allIds];
+    const batches = [];
+    for (let i = 0; i < idArray.length; i += 50) {
+      batches.push(idArray.slice(i, i + 50));
+    }
+
+    const priceMap = {};
+    for (const batch of batches) {
+      try {
+        const r = await fetch(
+          `https://api.coingecko.com/api/v3/simple/price?ids=${batch.join(',')}&vs_currencies=usd&include_24hr_change=true`,
+          { headers: { 'Accept': 'application/json', 'User-Agent': 'CryptoHypeRadar/1.0' } }
+        );
+        if (r.ok) {
+          const data = await r.json();
+          Object.assign(priceMap, data);
+        }
+      } catch(e) {
+        console.warn('[CHR cron] Price batch fetch failed:', e.message);
+      }
+    }
+
+    // ── Step 5: Upsert coin_prices ────────────────────────────────────────────
+    for (const [coinId, data] of Object.entries(priceMap)) {
+      const price = data.usd;
+      const change = data.usd_24h_change || 0;
+      if (!price) continue;
+      try {
+        await env.HYPE_TRADER.prepare(
+          `INSERT INTO coin_prices (coin_id, price_usd, change_24h, updated_at)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(coin_id) DO UPDATE SET
+             price_usd = excluded.price_usd,
+             change_24h = excluded.change_24h,
+             updated_at = excluded.updated_at`
+        ).bind(coinId, price, change, now).run();
+      } catch(e) {
+        console.warn('[CHR cron] coin_prices upsert failed for', coinId, e.message);
+      }
+    }
+
+    // ── Step 6: Signal flip alerts for saved/held coins ───────────────────────
+    // Load previous signal state from KV
+    const prevStateRaw = await env.HYPE_CACHE.get('_signal_state_v2');
+    const prevState = prevStateRaw ? JSON.parse(prevStateRaw) : {};
+    const newState = {};
+    radarCoins.forEach(c => {
+      newState[c.id] = signalFor(c.score, c.price_change);
+    });
+    await env.HYPE_CACHE.put('_signal_state_v2', JSON.stringify(newState), { expirationTtl: 3600 });
+
+    // Find coins that newly became 'moon' (BUY signal)
+    const newMoonIds = new Set(
+      radarCoins
+        .filter(c => newState[c.id] === 'moon' && prevState[c.id] !== 'moon')
+        .map(c => c.id)
+    );
+
+    // Send push alerts to subscribers watching these coins
+    if (newMoonIds.size > 0) {
+      const list = await env.HYPE_CACHE.list({ prefix: 'sub_' });
+      for (const key of list.keys) {
+        const raw = await env.HYPE_CACHE.get(key.name);
+        if (!raw) continue;
+        let record;
+        try { record = JSON.parse(raw); } catch(e) { continue; }
+        const { sub, coins: watchedCoins } = record;
+        if (!watchedCoins || !watchedCoins.length) continue;
+        const alerts = watchedCoins
+          .filter(id => newMoonIds.has(id))
+          .map(id => scoreMap[id])
+          .filter(Boolean);
+        if (!alerts.length) continue;
+        const coinList = alerts.map(c => `${c.symbol} +${c.price_change.toFixed(1)}%`).join(', ');
+        const title = alerts.length === 1
+          ? `🚀 BUY Signal: ${alerts[0].name}`
+          : `🚀 ${alerts.length} BUY Signals on Your Saved List`;
+        const body = alerts.length === 1
+          ? `${alerts[0].symbol} is trending with a strong BUY signal. +${alerts[0].price_change.toFixed(1)}% in 24h.`
+          : `New BUY signals: ${coinList}`;
+        try {
+          await sendPush(sub, { title, body }, env);
+        } catch(e) {
+          if (e.message && e.message.includes('410')) {
+            await env.HYPE_CACHE.delete(key.name);
+          }
+        }
+      }
+    }
+
+    console.log(`[CHR cron] Done. Radar: ${radarCoins.length} coins. Prices updated: ${Object.keys(priceMap).length}. New MOON signals: ${newMoonIds.size}`);
+  } catch(err) {
+    console.error('[CHR cron] runFullCron failed:', err.message);
+    // Fallback to original signal scan so push alerts still work
+    await runSignalScan(env);
+  }
 }
